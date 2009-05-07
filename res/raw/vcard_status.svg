@@ -17,8 +17,8 @@
    inkscape:output_extension="org.inkscape.output.svg.inkscape"
    version="1.0"
    inkscape:export-filename="../drawable/status_icon.png"
-   inkscape:export-xdpi="90"
-   inkscape:export-ydpi="90">
+   inkscape:export-xdpi="135"
+   inkscape:export-ydpi="135">
   <sodipodi:namedview
      id="base"
      pagecolor="#ffffff"
@@ -30,7 +30,7 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="22.4"
-     inkscape:cx="-2.8586077"
+     inkscape:cx="-9.6666434"
      inkscape:cy="9.1652966"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
@@ -43,19 +43,19 @@
      inkscape:guide-bbox="true">
     <sodipodi:guide
        orientation="1,0"
-       position="1.71875,12.120536"
+       position="2,27.321"
        id="guide3751" />
     <sodipodi:guide
        orientation="1,0"
-       position="14.285714,9.7321429"
+       position="14,9.7321429"
        id="guide3753" />
     <sodipodi:guide
        orientation="0,1"
-       position="9.5535714,13.080357"
+       position="1,2"
        id="guide3755" />
     <sodipodi:guide
        orientation="0,1"
-       position="6.2053571,2.8125"
+       position="6.2053571,14"
        id="guide3757" />
   </sodipodi:namedview>
   <defs
@@ -63,15 +63,15 @@
     <marker
        inkscape:stockid="Arrow1Mend"
        orient="auto"
-       refY="0.0"
-       refX="0.0"
+       refY="0"
+       refX="0"
        id="Arrow1Mend"
-       style="overflow:visible;">
+       style="overflow:visible">
       <path
          id="path3221"
-         d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z "
-         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none;"
-         transform="scale(0.4) rotate(180) translate(10,0)" />
+         d="M 0,0 L 5,-5 L -12.5,0 L 5,5 L 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(-0.4,0,0,-0.4,-4,0)" />
     </marker>
     <marker
        style="overflow:visible"
@@ -122,7 +122,7 @@
        inkscape:stockid="Arrow1Send7">
       <path
          transform="matrix(-0.2,0,0,-0.2,-1.2,0)"
-         style="marker-start:none;stroke:#008000;stroke-width:1pt;fill:#008000;fill-rule:evenodd"
+         style="fill:#008000;fill-rule:evenodd;stroke:#008000;stroke-width:1pt;marker-start:none"
          d="M 0,0 L 5,-5 L -12.5,0 L 5,5 L 0,0 z"
          id="path10258" />
     </marker>
@@ -157,7 +157,7 @@
          sodipodi:role="line" /></text>
     <path
        style="fill:#008000;fill-opacity:1;stroke:none;stroke-width:1.75100005;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none"
-       d="M 374.88914,481.72168 L 374.88914,481.84183 L 374.9372,481.81779 L 378.56585,490.15647 L 379.21466,488.47433 L 380.36815,496.64478 L 380.44025,496.64478 L 382.19448,496.64478 L 385.84717,488.3061 L 386.49599,489.98825 L 387.64947,481.81779 L 382.41077,488.13789 L 384.06889,487.48906 L 380.44025,495.8037 L 380.44025,481.72168 L 374.88914,481.72168 z M 380.36815,496.64478 L 375.12944,490.32468 L 376.81159,490.97352 L 373.13488,482.58678 L 373.13488,496.64478 L 380.36815,496.64478 z M 373.13488,482.58678 L 373.18296,482.56275 L 373.13488,482.56275 L 373.13488,482.58678 z"
+       d="M 375.84252,483.18323 L 375.84252,483.27984 L 375.88226,483.26052 L 378.88227,489.96582 L 379.41867,488.61318 L 380.37232,495.18323 L 380.43193,495.18323 L 381.88225,495.18323 L 384.90212,488.47791 L 385.43854,489.83057 L 386.39218,483.26052 L 382.06107,488.34266 L 383.43192,487.82091 L 380.43193,494.50689 L 380.43193,483.18323 L 375.84252,483.18323 z M 380.37232,495.18323 L 376.04118,490.10109 L 377.43192,490.62283 L 374.39218,483.87887 L 374.39218,495.18323 L 380.37232,495.18323 z M 374.39218,483.87887 L 374.43194,483.85956 L 374.39218,483.85956 L 374.39218,483.87887 z"
        id="rect5522" />
   </g>
   <g
