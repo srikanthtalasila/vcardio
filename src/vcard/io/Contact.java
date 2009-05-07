@@ -726,18 +726,22 @@ public class Contact {
         selectedColumn = cur.getColumnIndex(Contacts.PeopleColumns.NAME);
         displayName = cur.getString(selectedColumn);
 
-        Matcher m = namePattern.matcher(displayName);
-        if (m.matches()) {
-        	if (m.group(1) != null) {
-        		lastName = m.group(2);
-        		firstName = m.group(3);
+        if (displayName != null) {
+        	Matcher m = namePattern.matcher(displayName);
+        	if (m.matches()) {
+        		if (m.group(1) != null) {
+        			lastName = m.group(2);
+        			firstName = m.group(3);
+        		} else {
+        			firstName = m.group(5);
+        			lastName = m.group(6);
+        		}
         	} else {
-        		firstName = m.group(5);
-        		lastName = m.group(6);
+        		firstName = displayName;
+        		lastName = "";
         	}
         } else {
-        	firstName = displayName;
-        	lastName = "";
+        	firstName = lastName = "";
         }
         
         selectedColumn = cur.getColumnIndex(Contacts.People.NOTES);
