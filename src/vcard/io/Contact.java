@@ -654,6 +654,10 @@ public class Contact {
     		cardBuff.append(";WORK");
     		break;
     	}
+    	
+    	if (!StringUtil.isASCII(email.data))
+    		cardBuff.append(";CHARSET=UTF-8");
+
     	cardBuff.append(":").append(email.data.trim()).append(NL);
     }
 
@@ -692,6 +696,10 @@ public class Contact {
     		formatted.append(";PAGER");
     		break;
     	}
+    	
+    	
+    	if (!StringUtil.isASCII(phone.data))
+    		formatted.append(";CHARSET=UTF-8");
     	formatted.append(":").append(phone.data.trim()).append(NL);
     }
     
@@ -719,6 +727,8 @@ public class Contact {
     		formatted.append(";WORK");
     		break;
     	}
+    	if (!StringUtil.isASCII(addr.data))
+    		formatted.append(";CHARSET=UTF-8");
     	formatted.append(":;;").append(addr.data.replace(", ", ";").trim()).append(NL);
     }
     
@@ -750,6 +760,8 @@ public class Contact {
     	if (im.auxData != null) {
     		formatted.append(";").append(PROTO_PARAM).append("=").append(im.auxData);
     	}
+    	if (!StringUtil.isASCII(im.data))
+    		formatted.append(";CHARSET=UTF-8");
     	formatted.append(":").append(im.data.trim()).append(NL);
     }
     
@@ -768,6 +780,8 @@ public class Contact {
         		formatted.append(";" + LABEL_PARAM + "=");
         		formatted.append(org.customLabel);
         	}
+        	if (!StringUtil.isASCII(org.company))
+        		formatted.append(";CHARSET=UTF-8");
         	formatted.append(":").append(org.company.trim()).append(NL);
         	if (org.title == null)
         		formatted.append("TITLE:").append(NL);
@@ -780,6 +794,8 @@ public class Contact {
         		formatted.append(";" + LABEL_PARAM + "=");
         		formatted.append(org.customLabel);
         	}
+        	if (!StringUtil.isASCII(org.title))
+        		formatted.append(";CHARSET=UTF-8");
         	formatted.append(":").append(org.title.trim()).append(NL);
     	}
     }
@@ -804,9 +820,14 @@ public class Contact {
         vCardBuff.append("BEGIN:VCARD").append(NL);
         vCardBuff.append("VERSION:2.1").append(NL);
         
-       	appendField(vCardBuff, "X-IRMC-LUID:", syncid);
+       	appendField(vCardBuff, "X-IRMC-LUID", syncid);
         
-        vCardBuff.append("N:").append((lastName != null) ? lastName.trim() : "")
+        vCardBuff.append("N");
+
+    	if (!StringUtil.isASCII(lastName) || !StringUtil.isASCII(firstName))
+    		vCardBuff.append(";CHARSET=UTF-8");
+    	
+        vCardBuff.append(":").append((lastName != null) ? lastName.trim() : "")
                 .append(";").append((firstName != null) ? firstName.trim() : "")
                 .append(";").append(";").append(";").append(NL);
 
@@ -831,11 +852,11 @@ public class Contact {
         	formatIM(vCardBuff, im);
         }
 
-        appendField(vCardBuff, "NOTE:", notes);
-        appendField(vCardBuff, "BDAY:", birthday);
+        appendField(vCardBuff, "NOTE", notes);
+        appendField(vCardBuff, "BDAY", birthday);
         
         if (photo != null) {
-        	appendField(vCardBuff, "PHOTO;TYPE=JPEG;ENCODING=BASE64:", " ");
+        	appendField(vCardBuff, "PHOTO;TYPE=JPEG;ENCODING=BASE64", " ");
         	Base64Coder.mimeEncode(vCardBuff, photo, 76, NL);
         	vCardBuff.append(NL);
         	vCardBuff.append(NL);
@@ -848,9 +869,12 @@ public class Contact {
     /**
      * Append the field to the StringBuffer out if not null.
      */
-    private void appendField(Appendable out, String name, String val) throws IOException {
+    private static void appendField(Appendable out, String name, String val) throws IOException {
         if(val != null && val.length() > 0) {
-            out.append(name).append(val).append(NL);
+        	out.append(name);
+        	if (!StringUtil.isASCII(val))
+        		out.append(";CHARSET=UTF-8");
+            out.append(":").append(val).append(NL);
         }
     }
 

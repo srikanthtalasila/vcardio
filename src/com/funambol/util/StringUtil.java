@@ -309,5 +309,20 @@ public class StringUtil {
         }
         return false;
     }
+    
+    /**
+     * Returns true if the string does not fit in standard ASCII
+     */
+    public static boolean isASCII(String str) {
+    	if (str == null)
+    		return true;
+    	for (int i = 0; i < str.length(); ++i) {
+    		char c = str.charAt(i);
+    		if (c < 0 || c > 0x7f)
+    			return false;
+    	}
+    	return true;
+    }
+     
 }
 
