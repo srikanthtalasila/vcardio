@@ -45,10 +45,8 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.Vector;
 import java.util.regex.Matcher;
@@ -64,6 +62,7 @@ import android.database.sqlite.SQLiteStatement;
 import android.net.Uri;
 import android.net.Uri.Builder;
 import android.provider.Contacts;
+import android.provider.Contacts.ContactMethodsColumns;
 
 import com.funambol.util.Log;
 import com.funambol.util.QuotedPrintable;
@@ -74,7 +73,29 @@ import com.funambol.util.StringUtil;
  */
 public class Contact {
     static final String NL = "\r\n";
+    
+    
+    // Property name for Instant-message addresses
+    static final String IMPROP = "X-IM-NICK";
 
+    // Property parameter name for custom labels
+    static final String LABEL_PARAM = "LABEL";
+    
+    // Property parameter for IM protocol
+    static final String PROTO_PARAM = "PROTO";
+
+    // Protocol labels
+    static final String[] PROTO = {
+    	"AIM",		// ContactMethods.PROTOCOL_AIM = 0
+    	"MSN",		// ContactMethods.PROTOCOL_MSN = 1
+    	"YAHOO",	// ContactMethods.PROTOCOL_YAHOO = 2
+    	"SKYPE",	// ContactMethods.PROTOCOL_SKYPE = 3
+    	"QQ",		// ContactMethods.PROTOCOL_QQ = 4
+    	"GTALK",	// ContactMethods.PROTOCOL_GOOGLE_TALK = 5
+    	"ICQ",		// ContactMethods.PROTOCOL_ICQ = 6
+    	"JABBER"	// ContactMethods.PROTOCOL_JABBER = 7
+    };
+    
     long parseLen;
     
     static final String BIRTHDAY_FIELD = "Birthday:";
@@ -95,30 +116,55 @@ public class Contact {
     String lastName;
     
     static class RowData {
-    	RowData(int type, String data, boolean preferred) {
+    	RowData(int type, String data, boolean preferred, String customLabel) {
     		this.type = type;
     		this.data = data;
     		this.preferred = preferred;
+    		this.customLabel = customLabel;
+    		auxData = null;
     	}
+    	RowData(int type, String data, boolean preferred) {
+    		this(type, data, preferred, null);
+    	}
+
     	int type;
     	String data;
     	boolean preferred;    	
+    	String customLabel;
+    	String auxData;
+    }
+    
+    static class OrgData {
+    	OrgData(int type, String title, String company, String customLabel) {
+    		this.type = type;
+    		this.title = title;
+    		this.company = company;
+    		this.customLabel = customLabel;
+    	}
+    	int type;
+    	
+        // Contact title
+        String title;
+        // Contact company name
+    	String company;
+    	
+    	String customLabel;
     }
     
     // Phones dictionary; keys are android Contact Column ids
-    Map<Integer,List<RowData>> phones;
+    List<RowData> phones;
     
     // Emails dictionary; keys are android Contact Column ids
-    Map<Integer,List<RowData>> emails;
+    List<RowData> emails;
     
-    // Contact company name
-    String company;
-    
-    // Contact title
-    String title;
-
     // Address dictionary; keys are android Contact Column ids
-    Map<Integer,List<RowData>> addrs;
+    List<RowData> addrs;
+
+    // Instant message addr dictionary; keys are android Contact Column ids
+    List<RowData> ims;
+
+    // Organizations list
+    List<OrgData> orgs;
     
     // Compressed photo
     byte[] photo;
@@ -130,22 +176,6 @@ public class Contact {
     String birthday;
     
 	Hashtable<String, handleProp> propHandlers;
-	
-	/**
-	 * Add a row to a RowData list (such as {@link phones}, {@link emails}, {@link addrs}). 
-	 * Creates the row if none exists.  
-	 * @param database
-	 * @param rowdata
-	 */
-	final static void addRow(Map<Integer,List<RowData>> database, RowData rowdata) {
-		Integer column = Integer.valueOf(rowdata.type);
- 		List<RowData> list = database.get(column);
- 		if (list == null) {
- 			list = new ArrayList<RowData>(1);
- 			database.put(column, list);
- 		}
-		list.add(rowdata);
-	}
 	
 	interface handleProp {
 		void parseProp(final String propName, final Vector<String> propVec, final String val);
@@ -159,51 +189,104 @@ public class Contact {
 		 handleProp simpleValue = new handleProp() {
 			 public void parseProp(final String propName, final Vector<String> propVec, final String val) {
 				 if (propName.equals("FN")) {
-						displayName = val;
-				 } else if (propName.equals("TITLE")) {
-						title = val;
-				 } else if (propName.equals("ORG")) {
-		                String[] orgFields = StringUtil.split(val, ";");
-		                company = orgFields[0];
+					 displayName = val;
 				 } else if (propName.equals("NOTE")) {
-						notes = val;
+					 notes = val;
 				 } else if (propName.equals("BDAY")) {
-						birthday = val;
-				 } else if (propName.equals("X-IRMC-LUID")) {
-						syncid = val;
+					 birthday = val;
+				 } else if (propName.equals("X-IRMC-LUID") || propName.equals("UID")) {
+					 syncid = val;
 				 } else if (propName.equals("N")) {
-						String[] names = StringUtil.split(val, ";");
-						// We set only the first given name.
-						// The others are ignored in input and will not be
-						// overridden on the server in output.
-						if (names.length >= 2) {
-							firstName = names[1];
-							lastName = names[0];
-						} else {
-							String[] names2 = StringUtil.split(names[0], " ");
-							firstName = names2[0];
-							if (names2.length > 1)
-								lastName = names2[1];
-						}
+					 String[] names = StringUtil.split(val, ";");
+					 // We set only the first given name.
+					 // The others are ignored in input and will not be
+					 // overridden on the server in output.
+					 if (names.length >= 2) {
+						 firstName = names[1];
+						 lastName = names[0];
+					 } else {
+						 String[] names2 = StringUtil.split(names[0], " ");
+						 firstName = names2[0];
+						 if (names2.length > 1)
+							 lastName = names2[1];
+					 }
 				 } 
 			 }
 		 };
 
 		 propHandlers.put("FN", simpleValue);
-		 propHandlers.put("ORG", simpleValue);
-		 propHandlers.put("TITLE", simpleValue);
 		 propHandlers.put("NOTE", simpleValue);
 		 propHandlers.put("BDAY", simpleValue);
 		 propHandlers.put("X-IRMC-LUID", simpleValue);
+		 propHandlers.put("UID", simpleValue);
 		 propHandlers.put("N", simpleValue);
 
+		 handleProp orgHandler = new handleProp() {
+
+			@Override
+			public void parseProp(String propName, Vector<String> propVec,
+					String val) {
+				String label = null;
+				for (String prop : propVec) {
+					String[] propFields = StringUtil.split(prop, "=");
+					if (propFields[0].equalsIgnoreCase(LABEL_PARAM) && propFields.length > 1) {
+						label = propFields[1];
+					}
+				}
+				if (propName.equals("TITLE")) {
+					boolean setTitle = false;
+					for (OrgData org : orgs) {
+						if (label == null && org.customLabel != null)
+							continue;
+						if (label != null && !label.equals(org.customLabel))
+							continue;
+						
+						if (org.title == null) {
+							org.title = val;
+							setTitle = true;
+							break;
+						}
+					}
+					if (!setTitle) {
+						orgs.add(new OrgData(label == null ? ContactMethodsColumns.TYPE_WORK : ContactMethodsColumns.TYPE_CUSTOM,
+								val, null, label));
+					}
+				} else if (propName.equals("ORG")) {
+					String[] orgFields = StringUtil.split(val, ";");
+					boolean setCompany = false;
+					for (OrgData org : orgs) {
+						if (label == null && org.customLabel != null)
+							continue;
+						if (label != null && !label.equals(org.customLabel))
+							continue;
+
+						if (org.company == null) {
+							org.company = val;
+							setCompany = true;
+							break;
+						}
+					}
+					if (!setCompany) {
+						orgs.add(new OrgData(label == null ? ContactMethodsColumns.TYPE_WORK : ContactMethodsColumns.TYPE_CUSTOM,
+								null, orgFields[0], label));
+					}
+				 }
+			}
+		 };
+		 
+
+		 propHandlers.put("ORG", orgHandler);
+		 propHandlers.put("TITLE", orgHandler);
+		 
 		 propHandlers.put("TEL", new handleProp() {
 			 public void parseProp(final String propName, final Vector<String> propVec, final String val) {
+				 String label = null;
 				 int subtype = Contacts.PhonesColumns.TYPE_OTHER;
 				 boolean preferred = false;
 				 for (String prop : propVec) {
-					 if (prop.equalsIgnoreCase("HOME")) {
-						 subtype = Contacts.PhonesColumns.TYPE_HOME;
+					 if (prop.equalsIgnoreCase("HOME") || prop.equalsIgnoreCase("VOICE")) {
+						 if (subtype != Contacts.PhonesColumns.TYPE_FAX_HOME)
+							 subtype = Contacts.PhonesColumns.TYPE_HOME;
 					 } else if (prop.equalsIgnoreCase("WORK")) {
 						 if (subtype == Contacts.PhonesColumns.TYPE_FAX_HOME) {
 							 subtype = Contacts.PhonesColumns.TYPE_FAX_WORK;
@@ -220,9 +303,16 @@ public class Contact {
 						 subtype = Contacts.PhonesColumns.TYPE_PAGER;
 					 } else if (prop.equalsIgnoreCase("PREF")) {
 						 preferred = true;
+					 } else {
+						 String[] propFields = StringUtil.split(prop, "=");
+						 
+						 if (propFields.length > 1 && propFields[0].equalsIgnoreCase(LABEL_PARAM)) {
+							 label = propFields[1];
+							 subtype = Contacts.ContactMethodsColumns.TYPE_CUSTOM;
+						 }
 					 }
 				 }
-				 addRow(phones, new RowData(subtype, toCanonicalPhone(val), preferred));
+				 phones.add(new RowData(subtype, toCanonicalPhone(val), preferred, label));
 			 }
 		 });
 		 
@@ -230,7 +320,8 @@ public class Contact {
 		 propHandlers.put("ADR", new handleProp() {
 			 public void parseProp(final String propName, final Vector<String> propVec, final String val) {
 				 boolean preferred = false;
-				 int subtype = Contacts.ContactMethodsColumns.TYPE_WORK; // vCARD Spec says default is WORK
+				 String label = null;
+				 int subtype = Contacts.ContactMethodsColumns.TYPE_WORK; // vCard spec says default is WORK
 				 for (String prop : propVec) {
 					 if (prop.equalsIgnoreCase("WORK")) {
 						 subtype = Contacts.ContactMethodsColumns.TYPE_WORK;
@@ -238,6 +329,13 @@ public class Contact {
 						 subtype = Contacts.ContactMethodsColumns.TYPE_HOME;
 					 } else if (prop.equalsIgnoreCase("PREF")) {
 						 preferred = true;
+					 } else {
+						 String[] propFields = StringUtil.split(prop, "=");
+						 
+						 if (propFields.length > 1 && propFields[0].equalsIgnoreCase(LABEL_PARAM)) {
+							 label = propFields[1];
+							 subtype = Contacts.ContactMethodsColumns.TYPE_CUSTOM;
+						 }
 					 }
 				 }
 	             String[] addressFields = StringUtil.split(val, ";");
@@ -250,7 +348,7 @@ public class Contact {
 		             }
 	             }
 	             String address = addressBuf.toString();
-				 addRow(addrs, new RowData(subtype, address, preferred));
+	             addrs.add(new RowData(subtype, address, preferred, label));
 			 }
 		 });
 		 
@@ -258,19 +356,55 @@ public class Contact {
 		 propHandlers.put("EMAIL", new handleProp() {
 			 public void parseProp(final String propName, final Vector<String> propVec, final String val) {
 				 boolean preferred = false;
+				 String label = null;
 				 int subtype = Contacts.ContactMethodsColumns.TYPE_HOME; 
 				 for (String prop : propVec) {
 					 if (prop.equalsIgnoreCase("PREF")) {
 						 preferred = true;
 					 } else if (prop.equalsIgnoreCase("WORK")) {
 						 subtype = Contacts.ContactMethodsColumns.TYPE_WORK;
-					 }
+					 } else {
+						 String[] propFields = StringUtil.split(prop, "=");
+						 
+						 if (propFields.length > 1 && propFields[0].equalsIgnoreCase(LABEL_PARAM)) {
+							 label = propFields[1];
+							 subtype = Contacts.ContactMethodsColumns.TYPE_CUSTOM;
+						 }
+					 } 
 				 }
-				 addRow(emails, new RowData(subtype, val, preferred));
+				 emails.add(new RowData(subtype, val, preferred, label));
 			 }
 		 });
 		 
-
+		 propHandlers.put(IMPROP, new handleProp() {
+			 public void parseProp(final String propName, final Vector<String> propVec, final String val) {
+				 boolean preferred = false;
+				 String label = null;
+				 String proto = null;
+				 int subtype = Contacts.ContactMethodsColumns.TYPE_HOME; 
+				 for (String prop : propVec) {
+					 if (prop.equalsIgnoreCase("PREF")) {
+						 preferred = true;
+					 } else if (prop.equalsIgnoreCase("WORK")) {
+						 subtype = Contacts.ContactMethodsColumns.TYPE_WORK;
+					 } else {
+						 String[] propFields = StringUtil.split(prop, "=");
+						 
+						 if (propFields.length > 1) {
+							 if (propFields[0].equalsIgnoreCase(PROTO_PARAM)) {
+								 proto = propFields[1];
+							 } else if (propFields[0].equalsIgnoreCase(LABEL_PARAM)) {
+								 label = propFields[1];
+							 }
+						 }
+					 } 
+				 }
+				 RowData newRow = new RowData(subtype, val, preferred, label); 
+				 newRow.auxData = proto;
+				 ims.add(newRow);
+			 }
+		 });
+		 
 		 propHandlers.put("PHOTO", new handleProp() {
 			 public void parseProp(final String propName, final Vector<String> propVec, final String val) {
 				 boolean isUrl = false;
@@ -295,16 +429,21 @@ public class Contact {
 		 syncid = null;
 		 parseLen = 0;
 		 displayName = null;
-		 title = null;
-		 company = null;
 		 notes = null;
 		 birthday = null;
 		 photo = null;
 		 firstName = null;
 		 lastName = null;
-		 phones = new HashMap<Integer, List<RowData>>();
-		 emails = new HashMap<Integer, List<RowData>>();
-		 addrs = new HashMap<Integer, List<RowData>>();
+		 if (phones == null) phones = new ArrayList<RowData>();
+		 else phones.clear();
+		 if (emails == null) emails = new ArrayList<RowData>();
+		 else emails.clear();
+		 if (addrs == null) addrs = new ArrayList<RowData>();
+		 else addrs.clear();
+		 if (orgs == null) orgs = new ArrayList<OrgData>();
+		 else orgs.clear();
+		 if (ims == null) ims = new ArrayList<RowData>();
+		 else ims.clear();
 	}
 
 	SQLiteStatement querySyncId;
@@ -377,14 +516,14 @@ public class Contact {
         return Long.parseLong(_id);
     }
 
-	final static Pattern beginPattern = Pattern.compile("BEGIN:VCARD");
+	final static Pattern beginPattern = Pattern.compile("BEGIN:VCARD",Pattern.CASE_INSENSITIVE);
 	final static Pattern propPattern = Pattern.compile("([^:]+):(.*)");
 	final static Pattern propParamPattern = Pattern.compile("([^;=]+)(=([^;]+))?(;|$)");
 	final static Pattern base64Pattern = Pattern.compile("\\s*([a-zA-Z0-9+/]+={0,2})\\s*$");
     final static Pattern namePattern = Pattern.compile("(([^,]+),(.*))|((.*?)\\s+(\\S+))");
     
 	// Parse birthday in notes
-	final static Pattern birthdayPattern = Pattern.compile("^" + BIRTHDAY_FIELD + ":\\s*([^;]+)(;\\s*|\\s*$)");
+	final static Pattern birthdayPattern = Pattern.compile("^" + BIRTHDAY_FIELD + ":\\s*([^;]+)(;\\s*|\\s*$)",Pattern.CASE_INSENSITIVE);
 	   
     /**
      * Parse the vCard string into the contacts fields
@@ -454,9 +593,9 @@ public class Contact {
     			String charSet = "UTF-8";
     			String encoding = "";
     			while (ppm.find()) {
-    				propVec.add(ppm.group());
     				String param = ppm.group(1);
     				String paramVal = ppm.group(3);
+    				propVec.add(param + (paramVal != null ? "=" + paramVal : ""));
     				if (param.equalsIgnoreCase("CHARSET"))
     					charSet = paramVal;
     				else if (param.equalsIgnoreCase("ENCODING"))
@@ -505,7 +644,11 @@ public class Contact {
     	cardBuff.append("EMAIL;INTERNET");
     	if (email.preferred)
     		cardBuff.append(";PREF");
-    	
+
+    	if (email.customLabel != null) {
+    		cardBuff.append(";" + LABEL_PARAM + "=");
+    		cardBuff.append(email.customLabel);
+    	}
     	switch (email.type) {
     	case Contacts.ContactMethodsColumns.TYPE_WORK:
     		cardBuff.append(";WORK");
@@ -524,7 +667,11 @@ public class Contact {
     	formatted.append("TEL");
     	if (phone.preferred)
     		formatted.append(";PREF");
-    	
+
+    	if (phone.customLabel != null) {
+    		formatted.append(";" + LABEL_PARAM + "=");
+    		formatted.append(phone.customLabel);
+    	}
     	switch (phone.type) {
     	case Contacts.PhonesColumns.TYPE_HOME:
     		formatted.append(";VOICE");
@@ -558,6 +705,11 @@ public class Contact {
     	formatted.append("ADR");
     	if (addr.preferred)
     		formatted.append(";PREF");
+
+    	if (addr.customLabel != null) {
+    		formatted.append(";" + LABEL_PARAM + "=");
+    		formatted.append(addr.customLabel);
+    	}
     	
     	switch (addr.type) {
     	case Contacts.ContactMethodsColumns.TYPE_HOME:
@@ -568,6 +720,68 @@ public class Contact {
     		break;
     	}
     	formatted.append(":;;").append(addr.data.replace(", ", ";").trim()).append(NL);
+    }
+    
+    /**
+     * Format an IM contact as a vCard field.
+     *  
+     * @param formatted Formatted im contact will be appended to this buffer
+     * @param addr The rowdata containing the actual phone data.
+     */
+    public static void formatIM(Appendable formatted, RowData im)  throws IOException  {
+    	formatted.append(IMPROP);
+    	if (im.preferred)
+    		formatted.append(";PREF");
+    	
+    	if (im.customLabel != null) {
+    		formatted.append(";" + LABEL_PARAM + "=");
+    		formatted.append(im.customLabel);
+    	}
+    	
+    	switch (im.type) {
+    	case Contacts.ContactMethodsColumns.TYPE_HOME:
+    		formatted.append(";HOME");
+    		break;
+    	case Contacts.ContactMethodsColumns.TYPE_WORK:
+    		formatted.append(";WORK");
+    		break;
+    	}
+    	
+    	if (im.auxData != null) {
+    		formatted.append(";").append(PROTO_PARAM).append("=").append(im.auxData);
+    	}
+    	formatted.append(":").append(im.data.trim()).append(NL);
+    }
+    
+    /**
+     * Format Organization fields.
+     *  
+     *  
+     *  
+     * @param formatted Formatted organization info will be appended to this buffer
+     * @param addr The rowdata containing the actual organization data.
+     */
+    public static void formatOrg(Appendable formatted, OrgData org)  throws IOException  {
+    	if (org.company != null) {
+    		formatted.append("ORG");
+        	if (org.customLabel != null) {
+        		formatted.append(";" + LABEL_PARAM + "=");
+        		formatted.append(org.customLabel);
+        	}
+        	formatted.append(":").append(org.company.trim()).append(NL);
+        	if (org.title == null)
+        		formatted.append("TITLE:").append(NL);
+    	}
+    	if (org.title != null) {
+        	if (org.company == null)
+        		formatted.append("ORG:").append(NL);
+    		formatted.append("TITLE");
+        	if (org.customLabel != null) {
+        		formatted.append(";" + LABEL_PARAM + "=");
+        		formatted.append(org.customLabel);
+        	}
+        	formatted.append(":").append(org.title.trim()).append(NL);
+    	}
     }
 
     
@@ -597,32 +811,28 @@ public class Contact {
                 .append(";").append(";").append(";").append(NL);
 
         
+        for (RowData email : emails) {
+    		formatEmail(vCardBuff, email);
+    	}
+        
+        for (RowData phone : phones) {
+    		formatPhone(vCardBuff, phone);
+    	}
 
-        for (List<RowData> emailist : emails.values()) {
-        	for (RowData email : emailist) {
-        		formatEmail(vCardBuff, email);
-        	}
+        for (OrgData org : orgs) {
+        	formatOrg(vCardBuff, org);
         }
         
-        for (List<RowData> phonelist : phones.values()) {
-        	for (RowData phone : phonelist) {
-        		formatPhone(vCardBuff, phone);
-        	}
+        for (RowData addr : addrs) {
+        	formatAddr(vCardBuff, addr);
         }
 
-        appendField(vCardBuff, "ORG:", company);
-        appendField(vCardBuff, "TITLE:", title);
-
-
-        for (List<RowData> addrlist : addrs.values()) {
-	        for (RowData addr : addrlist) {
-	        	formatAddr(vCardBuff, addr);
-	        }
+        for (RowData im : ims) {
+        	formatIM(vCardBuff, im);
         }
 
         appendField(vCardBuff, "NOTE:", notes);
         appendField(vCardBuff, "BDAY:", birthday);
-
         
         if (photo != null) {
         	appendField(vCardBuff, "PHOTO;TYPE=JPEG;ENCODING=BASE64:", " ");
@@ -674,7 +884,9 @@ public class Contact {
         
         // Set the organization fields
         if (organization.moveToFirst()) {
-            setOrganizationFields(organization);
+        	do {
+        		setOrganizationFields(organization);
+        	} while (organization.moveToNext());
         }
         organization.close();
         
@@ -692,7 +904,7 @@ public class Contact {
         Cursor contactMethods = cResolver.query(Contacts.ContactMethods.CONTENT_URI,
                 null, Contacts.ContactMethods.PERSON_ID + "=" + personID, null, null);
 
-        // Set all the email addresses
+        // Set all the contact methods (emails, addresses, ims)
         if (contactMethods.moveToFirst()) {
             do {
                 setContactMethodsFields(contactMethods);
@@ -766,10 +978,23 @@ public class Contact {
         //
         // Get Organizations fields
         //
-        selectedColumn = cur.getColumnIndex(Contacts.Organizations.COMPANY);
-        company = cur.getString(selectedColumn);
-        selectedColumn = cur.getColumnIndex(Contacts.Organizations.TITLE);
-        title = cur.getString(selectedColumn);
+        selectedColumn = cur.getColumnIndex(Contacts.OrganizationColumns.COMPANY);
+        String company = cur.getString(selectedColumn);
+
+        selectedColumn = cur.getColumnIndex(Contacts.OrganizationColumns.TITLE);
+        String title = cur.getString(selectedColumn);
+
+        selectedColumn = cur.getColumnIndex(Contacts.OrganizationColumns.TYPE);
+        int orgType = cur.getInt(selectedColumn);
+        
+        String customLabel = null;        
+        if (orgType == Contacts.ContactMethodsColumns.TYPE_CUSTOM) {
+        	selectedColumn = cur
+        		.getColumnIndex(Contacts.ContactMethodsColumns.LABEL);
+        	customLabel = cur.getString(selectedColumn);
+        }
+        
+        orgs.add(new OrgData(orgType, title, company, customLabel));
     }
 
     /**
@@ -781,6 +1006,7 @@ public class Contact {
         int selectedColumnType;
         int preferredColumn;
         int phoneType;
+        String customLabel = null;
 
         //
         // Get PhonesColums fields
@@ -791,9 +1017,12 @@ public class Contact {
         phoneType = cur.getInt(selectedColumnType);
         String phone = cur.getString(selectedColumn);
         boolean preferred = cur.getInt(preferredColumn) != 0;
+        if (phoneType == Contacts.PhonesColumns.TYPE_CUSTOM) {
+        	customLabel = cur.getString(cur.getColumnIndex(Contacts.PhonesColumns.LABEL));
+        }
         
         
-        addRow(phones, new RowData(phoneType, phone, preferred));
+        phones.add(new RowData(phoneType, phone, preferred, customLabel));
     }
 
     /**
@@ -805,9 +1034,12 @@ public class Contact {
         int selectedColumnType;
         int selectedColumnKind;
         int selectedColumnPrimary;
+        int selectedColumnLabel;
         
         int methodType;
         int kind;
+        String customLabel = null;
+        String auxData = null;
 
         //
         // Get ContactsMethodsColums fields
@@ -826,13 +1058,47 @@ public class Contact {
         methodType = cur.getInt(selectedColumnType);
         String methodData = cur.getString(selectedColumn);
         boolean preferred = cur.getInt(selectedColumnPrimary) != 0;
+        if (methodType == Contacts.ContactMethodsColumns.TYPE_CUSTOM) {
+        	selectedColumnLabel = cur
+        		.getColumnIndex(Contacts.ContactMethodsColumns.LABEL);
+        	customLabel = cur.getString(selectedColumnLabel);
+        }
         
         switch (kind) {
         case Contacts.KIND_EMAIL:
-        	addRow(emails, new RowData(methodType, methodData, preferred));
+        	emails.add(new RowData(methodType, methodData, preferred, customLabel));
         	break;
         case Contacts.KIND_POSTAL:
-        	addRow(addrs, new RowData(methodType, methodData, preferred));
+        	addrs.add(new RowData(methodType, methodData, preferred, customLabel));
+        	break;
+        case Contacts.KIND_IM:
+            RowData newRow = new RowData(methodType, methodData, preferred, customLabel);
+            
+            selectedColumn = cur.getColumnIndex(Contacts.ContactMethodsColumns.AUX_DATA);
+            auxData = cur.getString(selectedColumn);
+
+            if (auxData != null) {
+            	String[] auxFields = StringUtil.split(auxData, ":");
+            	if (auxFields.length > 1) {
+            		if (auxFields[0].equalsIgnoreCase("pre")) {
+            			int protval = 0;
+            			try {
+            				protval = Integer.decode(auxFields[1]);
+            			} catch (NumberFormatException e) {
+            				// Do nothing; protval = 0
+            			}
+            			if (protval < 0 || protval >= PROTO.length)
+            				protval = 0;
+            			newRow.auxData = PROTO[protval];
+            		} else if (auxFields[0].equalsIgnoreCase("custom")) {
+            			newRow.auxData = auxFields[1];
+            		}
+            	} else {
+            		newRow.auxData = auxData;
+            	}
+            }
+            
+        	ims.add(newRow);
         	break;
         }
     }
@@ -855,8 +1121,8 @@ public class Contact {
         }
         
         // Use company name if only the company is given.
-        if (fullname.length() == 0)
-        	fullname.append(company);
+        if (fullname.length() == 0 && orgs.size() > 0 && orgs.get(0).company != null)
+        	fullname.append(orgs.get(0).company);
 
         cv.put(Contacts.People.NAME, fullname.toString());
 
@@ -881,17 +1147,20 @@ public class Contact {
         return cv;
     }
     
-    public ContentValues getOrganizationCV() {
+    public ContentValues getOrganizationCV(OrgData org) {
 
-        if(StringUtil.isNullOrEmpty(company) && StringUtil.isNullOrEmpty(title)) {
+        if(StringUtil.isNullOrEmpty(org.company) && StringUtil.isNullOrEmpty(org.title)) {
             return null;
         }
         ContentValues cv = new ContentValues();
     
-        cv.put(Contacts.Organizations.COMPANY, company);
-        cv.put(Contacts.Organizations.TITLE, title);
-        cv.put(Contacts.Organizations.TYPE, Contacts.Organizations.TYPE_WORK);
+        cv.put(Contacts.Organizations.COMPANY, org.company);
+        cv.put(Contacts.Organizations.TITLE, org.title);
+        cv.put(Contacts.Organizations.TYPE, org.type);
         cv.put(Contacts.Organizations.PERSON_ID, _id);
+        if (org.customLabel != null) {
+        	cv.put(Contacts.Organizations.LABEL, org.customLabel);
+        }
         
         return cv;
     }
@@ -903,6 +1172,9 @@ public class Contact {
         cv.put(Contacts.Phones.TYPE, data.type);
         cv.put(Contacts.Phones.ISPRIMARY, data.preferred ? 1 : 0);
         cv.put(Contacts.Phones.PERSON_ID, _id);
+        if (data.customLabel != null) {
+        	cv.put(Contacts.Phones.LABEL, data.customLabel);
+        }
 
         return cv;
     }
@@ -911,12 +1183,15 @@ public class Contact {
     public ContentValues getEmailCV(RowData data) {
         ContentValues cv = new ContentValues();
 
-        cv.put(Contacts.ContactMethodsColumns.DATA, data.data);
-        cv.put(Contacts.ContactMethodsColumns.TYPE, data.type);
-        cv.put(Contacts.ContactMethodsColumns.KIND,
+        cv.put(Contacts.ContactMethods.DATA, data.data);
+        cv.put(Contacts.ContactMethods.TYPE, data.type);
+        cv.put(Contacts.ContactMethods.KIND,
                 Contacts.KIND_EMAIL);
-        cv.put(Contacts.ContactMethodsColumns.ISPRIMARY, data.preferred ? 1 : 0);
+        cv.put(Contacts.ContactMethods.ISPRIMARY, data.preferred ? 1 : 0);
         cv.put(Contacts.ContactMethods.PERSON_ID, _id);
+        if (data.customLabel != null) {
+        	cv.put(Contacts.ContactMethods.LABEL, data.customLabel);
+        }
 
         return cv;
     }
@@ -924,12 +1199,45 @@ public class Contact {
     public ContentValues getAddressCV(RowData data) {
         ContentValues cv = new ContentValues();
 
-        cv.put(Contacts.ContactMethodsColumns.DATA, data.data);
-        cv.put(Contacts.ContactMethodsColumns.TYPE, data.type);
-        cv.put(Contacts.ContactMethodsColumns.KIND,
-                Contacts.KIND_POSTAL);
-        cv.put(Contacts.ContactMethodsColumns.ISPRIMARY, data.preferred ? 1 : 0);
+        cv.put(Contacts.ContactMethods.DATA, data.data);
+        cv.put(Contacts.ContactMethods.TYPE, data.type);
+        cv.put(Contacts.ContactMethods.KIND, Contacts.KIND_POSTAL);
+        cv.put(Contacts.ContactMethods.ISPRIMARY, data.preferred ? 1 : 0);
         cv.put(Contacts.ContactMethods.PERSON_ID, _id);
+        if (data.customLabel != null) {
+        	cv.put(Contacts.ContactMethods.LABEL, data.customLabel);
+        }
+
+        return cv;
+    }
+    
+
+    public ContentValues getImCV(RowData data) {
+        ContentValues cv = new ContentValues();
+
+        cv.put(Contacts.ContactMethods.DATA, data.data);
+        cv.put(Contacts.ContactMethods.TYPE, data.type);
+        cv.put(Contacts.ContactMethods.KIND, Contacts.KIND_IM);
+        cv.put(Contacts.ContactMethods.ISPRIMARY, data.preferred ? 1 : 0);
+        cv.put(Contacts.ContactMethods.PERSON_ID, _id);
+        if (data.customLabel != null) {
+        	cv.put(Contacts.ContactMethods.LABEL, data.customLabel);
+        }
+        
+        if (data.auxData != null) {
+        	int protoNum = -1;
+        	for (int i = 0; i < PROTO.length; ++i) {
+        		if (data.auxData.equalsIgnoreCase(PROTO[i])) {
+        			protoNum = i;
+        			break;
+        		}
+        	}
+        	if (protoNum >= 0) {
+        		cv.put(Contacts.ContactMethods.AUX_DATA, "pre:"+protoNum);
+        	} else {
+        		cv.put(Contacts.ContactMethods.AUX_DATA, "custom:"+data.auxData);
+        	}
+        }
 
         return cv;
     }
@@ -1044,29 +1352,31 @@ public class Contact {
         }
         
         // Phones
-        for (List<RowData> phonelist : phones.values()) {
-	        for (RowData phone : phonelist) {
-	        	insertContentValues(cResolver, Contacts.Phones.CONTENT_URI, getPhoneCV(phone));
-	        }
+        for (RowData phone : phones) {
+        	insertContentValues(cResolver, Contacts.Phones.CONTENT_URI, getPhoneCV(phone));
         }
-
-        insertContentValues(cResolver, Contacts.Organizations.CONTENT_URI, getOrganizationCV());
-
+        
+        // Organizations
+        for (OrgData org : orgs) {
+        	insertContentValues(cResolver, Contacts.Organizations.CONTENT_URI, getOrganizationCV(org));
+        }
+        
         Builder builder = newContactUri.buildUpon();
         builder.appendEncodedPath(Contacts.ContactMethods.CONTENT_URI.getPath());
 
         // Emails
-        for (List<RowData> emailist : emails.values()) {
-	        for (RowData email : emailist) {
-	        	insertContentValues(cResolver, builder.build(), getEmailCV(email));
-	        }
+        for (RowData email : emails) {
+        	insertContentValues(cResolver, builder.build(), getEmailCV(email));
         }
         
-        // Addressess 
-        for (List<RowData> addrlist : addrs.values()) {
-	        for (RowData addr : addrlist) {
-	        	insertContentValues(cResolver, builder.build(), getAddressCV(addr));
-	        }
+        // Addressess
+        for (RowData addr : addrs) {
+        	insertContentValues(cResolver, builder.build(), getAddressCV(addr));
+        }
+        
+        // IMs
+        for (RowData im : ims) {
+        	insertContentValues(cResolver, builder.build(), getImCV(im));
         }
         
         // Photo
