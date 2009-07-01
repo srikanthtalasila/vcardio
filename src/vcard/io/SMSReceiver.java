@@ -11,8 +11,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Contacts.People;
 import android.telephony.gsm.SmsMessage;
-import android.util.Log;
-import android.widget.Toast;
 
 /**
  * The class is called when SMS is received.
@@ -39,29 +37,35 @@ public class SMSReceiver extends BroadcastReceiver {
         	if(isVCard(body)){
         		Uri person = readCard(context, body);
         		
-        		notify(context, "Adding contact data received from " + message.getOriginatingAddress(), person.toString());
+        		notify(context, "Adding contact data received from " + message.getOriginatingAddress(), person.toString(), body);
         	}
         }
     }
     
-	private static final int HELLO_ID = 1;
+	private static final int VCARD_RECEIVED_ID = 1;
     
-    private void notify(final Context context, final String title, final String text){
+    private void notify(final Context context, final String title, final String text, final String vcard){
     	String ns = Context.NOTIFICATION_SERVICE;
     	NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(ns);
     	int icon = R.drawable.icon;
+    	
     	CharSequence tickerText = "New contact received";
+    	CharSequence contentTitle = title;
+    	CharSequence contentText = text;
+    	
     	long when = System.currentTimeMillis();
 
     	Notification notification = new Notification(icon, tickerText, when);
+    	notification.flags |= Notification.FLAG_AUTO_CANCEL;
     	
-    	CharSequence contentTitle = title;
-    	CharSequence contentText = text;
-    	Intent notificationIntent = new Intent(context, SMSReceiver.class);
+    	
+    	Intent notificationIntent = new Intent(context, VCardAdder.class);
+    	notificationIntent.putExtra("vcard", vcard);
+    	notificationIntent.setAction("vcard.io.SMS");
     	PendingIntent contentIntent = PendingIntent.getActivity(context, 0, notificationIntent, 0);
 
     	notification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
-    	mNotificationManager.notify(HELLO_ID, notification);
+    	mNotificationManager.notify(VCARD_RECEIVED_ID, notification);
     }
     
     private boolean isVCard(final String content){
@@ -74,10 +78,4 @@ public class SMSReceiver extends BroadcastReceiver {
     	Uri myPerson = ContentUris.withAppendedId(People.CONTENT_URI, row);
     	return myPerson;
     }    
-    
-    private void showToUser(final Context context, final String message){
-    	 Toast toast = Toast.makeText(context, message, Toast.LENGTH_LONG);
-         Log.i("test", message );
-         toast.show();
-    }
 }
