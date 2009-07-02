@@ -4,12 +4,9 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
-import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Contacts.People;
 import android.telephony.gsm.SmsMessage;
 
 /**
@@ -17,6 +14,12 @@ import android.telephony.gsm.SmsMessage;
  * 
  */
 public class SMSReceiver extends BroadcastReceiver {
+	
+	public static final String VCARD_ACTION = "vcard.io.SMS";
+	public static final String VCARD_EXTRA = "vcard";
+	
+	private static final int VCARD_RECEIVED_ID = 1;
+	
 
     /**
      * @see android.content.BroadcastReceiver#onReceive(android.content.Context, android.content.Intent)
@@ -34,48 +37,42 @@ public class SMSReceiver extends BroadcastReceiver {
         String body;
         for(SmsMessage message:smsMessage){
         	body = message.getMessageBody();
-        	if(isVCard(body)){
-        		Uri person = readCard(context, body);
-        		
-        		notify(context, "Adding contact data received from " + message.getOriginatingAddress(), person.toString(), body);
+        	if(isVCard(body)){        		
+        		notify(context, message.getOriginatingAddress(), body);
         	}
         }
     }
     
-	private static final int VCARD_RECEIVED_ID = 1;
+
     
-    private void notify(final Context context, final String title, final String text, final String vcard){
+    private void notify(final Context context, final String address, final String vcard){
     	String ns = Context.NOTIFICATION_SERVICE;
     	NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(ns);
     	int icon = R.drawable.icon;
     	
     	CharSequence tickerText = "New contact received";
-    	CharSequence contentTitle = title;
-    	CharSequence contentText = text;
+    	CharSequence contentTitle = "New contact received";
+    	CharSequence contentText = "VCARD received from " + address;
     	
     	long when = System.currentTimeMillis();
 
     	Notification notification = new Notification(icon, tickerText, when);
     	notification.flags |= Notification.FLAG_AUTO_CANCEL;
     	
-    	
     	Intent notificationIntent = new Intent(context, VCardAdder.class);
     	notificationIntent.putExtra("vcard", vcard);
-    	notificationIntent.setAction("vcard.io.SMS");
+    	notificationIntent.setAction(VCARD_ACTION);
     	PendingIntent contentIntent = PendingIntent.getActivity(context, 0, notificationIntent, 0);
 
     	notification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
     	mNotificationManager.notify(VCARD_RECEIVED_ID, notification);
+    	// TODO increment the id each time or update the existing notification?
+    	
     }
     
     private boolean isVCard(final String content){
     	return content.startsWith("BEGIN:VCARD");
     }
     
-    private Uri readCard(final Context context, final String vcard) {
-    	Contact contact = new Contact(vcard, null, null, null);
-    	long row = contact.addContact(context, 0, false);
-    	Uri myPerson = ContentUris.withAppendedId(People.CONTENT_URI, row);
-    	return myPerson;
-    }    
+    
 }
