@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -18,6 +19,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class App extends Activity {
+	
+	public static final String PREFS_NAME = "VCardIOPrefsFile";
+	public static final String MONITOR_SMS_PREF = "monitorsms";
+	
     /** Called when the activity is first created. */
 	boolean isActive; 
 	
@@ -27,7 +32,8 @@ public class App extends Activity {
 	int mLastProgress;
 	TextView mStatusText = null;
 	
-	CheckBox mReplaceOnImport = null;
+	private CheckBox mReplaceOnImport = null;
+	private CheckBox mReceiveSMS;
 
 	@Override
 	protected void onPause() {
@@ -44,6 +50,21 @@ public class App extends Activity {
 		isActive = true;
 		updateProgress(mLastProgress);
 	}	
+	
+	@Override
+	protected void onStop() {
+		super.onStop();
+	    
+	    // Save user preferences. We need an Editor object to
+	    // make changes. All objects are from android.context.Context
+	    SharedPreferences settings = getSharedPreferences(PREFS_NAME, 0);
+	    SharedPreferences.Editor editor = settings.edit();
+	    editor.putBoolean(MONITOR_SMS_PREF, mReceiveSMS.isChecked());
+
+	    // Don't forget to commit your edits!!!
+	    editor.commit();
+
+	}
 		
 	protected void updateProgress(final int progress) {
 		// Update the progress bar
@@ -87,6 +108,7 @@ public class App extends Activity {
 
     	mStatusText = ((TextView) findViewById(R.id.StatusText));
     	mReplaceOnImport = ((CheckBox) findViewById(R.id.ReplaceOnImport));
+    	mReceiveSMS = ((CheckBox) findViewById(R.id.ReceiveSMS));
     	
     	final Intent app = new Intent(App.this, VCardIO.class);
         OnClickListener listenImport = new OnClickListener() {
@@ -134,6 +156,11 @@ public class App extends Activity {
         bindService(app, mConnection, Context.BIND_AUTO_CREATE);
         importButton.setOnClickListener(listenImport);
         exportButton.setOnClickListener(listenExport);
+        
+        // Restore preferences
+        SharedPreferences settings = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        boolean monitor = settings.getBoolean(MONITOR_SMS_PREF, false);
+        mReceiveSMS.setChecked(monitor);
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {

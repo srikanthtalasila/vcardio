@@ -6,6 +6,7 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.telephony.gsm.SmsMessage;
 
@@ -26,21 +27,25 @@ public class SMSReceiver extends BroadcastReceiver {
      */
     @Override
     public void onReceive(Context context, Intent intent) {
-        Bundle bundle = intent.getExtras();
-
-        Object messages[] = (Object[]) bundle.get("pdus");
-        SmsMessage smsMessage[] = new SmsMessage[messages.length];
-        for (int n = 0; n < messages.length; n++) {
-            smsMessage[n] = SmsMessage.createFromPdu((byte[]) messages[n]);
-        }
-
-        String body;
-        for(SmsMessage message:smsMessage){
-        	body = message.getMessageBody();
-        	if(isVCard(body)){        		
-        		notify(context, message.getOriginatingAddress(), body);
-        	}
-        }
+    	SharedPreferences settings = context.getSharedPreferences(App.PREFS_NAME, 0);
+        boolean monitor = settings.getBoolean(App.MONITOR_SMS_PREF, false);
+    	if(monitor){
+	        Bundle bundle = intent.getExtras();
+	
+	        Object messages[] = (Object[]) bundle.get("pdus");
+	        SmsMessage smsMessage[] = new SmsMessage[messages.length];
+	        for (int n = 0; n < messages.length; n++) {
+	            smsMessage[n] = SmsMessage.createFromPdu((byte[]) messages[n]);
+	        }
+	
+	        String body;
+	        for(SmsMessage message:smsMessage){
+	        	body = message.getMessageBody();
+	        	if(isVCard(body)){        		
+	        		notify(context, message.getOriginatingAddress(), body);
+	        	}
+	        }
+    	}
     }
     
 
