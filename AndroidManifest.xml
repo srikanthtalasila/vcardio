@@ -18,6 +18,11 @@
 	  		<intent-filter>
 	   			<action android:name="android.provider.Telephony.SMS_RECEIVED" />
 	  		</intent-filter>
+	  		<!-- <intent-filter>
+			    <action android:name="android.intent.action.VIEW" />
+			    <category android:name="android.intent.category.DEFAULT" />
+			    <data android:mimeType="text/x-vcard" />
+			</intent-filter> -->
 		</receiver>
 	</application>
 	<uses-permission android:name="android.permission.WRITE_CONTACTS"></uses-permission>
