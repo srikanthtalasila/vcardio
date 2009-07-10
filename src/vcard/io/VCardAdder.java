@@ -40,6 +40,7 @@ public class VCardAdder extends Activity{
 		           public void onClick(DialogInterface dialog, int id) {
 		        	   Uri person = importCard(VCardAdder.this, vcard);
 		        	   Toast.makeText(VCardAdder.this, "Contact added.", Toast.LENGTH_SHORT).show();
+		        	   showContact(person);
 		        	   VCardAdder.this.finish();
 		           }
 		       })
@@ -50,6 +51,13 @@ public class VCardAdder extends Activity{
 		       });
 		AlertDialog alert = builder.create();
 		alert.show();
+	}
+	
+	private void showContact(Uri person){
+		Intent intent = new Intent(Intent.ACTION_VIEW);
+ 		intent.setData(person);
+ 		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+ 		startActivity(intent);
 	}
 	
 	
