@@ -1,5 +1,8 @@
 package vcard.io;
 
+import java.io.File;
+import java.io.IOException;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ContentUris;
@@ -9,28 +12,50 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Contacts.People;
+import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class VCardAdder extends Activity{
-
+public class VCardAdder extends Activity {
+	
+	private static final String TAG = VCardAdder.class.getSimpleName();
+	
 	private TextView textView;
+	
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.adder);
+        textView = ((TextView) findViewById(R.id.TextView01));
+    }
 	
 	@Override
 	protected void onResume() {
 		super.onResume();
-		
 		Intent intent = getIntent();
         if(intent != null){
-        	if(SMSReceiver.VCARD_ACTION.equals(intent.getAction())){
-        		final String vcard = intent.getExtras().getString(SMSReceiver.VCARD_EXTRA);
+        	if(SMSReceiver.ACTION_VCARD_SMS.equals(intent.getAction())){
+        		String vcard = intent.getExtras().getString(SMSReceiver.VCARD_EXTRA);
         		textView.setText(vcard);
         		askUserForImport(vcard);
+        	}else if(Intent.ACTION_VIEW.equals(intent.getAction())){
+        		//data=file:///sdcard/download/addressBookExport-1.vcf
+        		Uri uri = intent.getData();
+        		File vcfFile = new File(uri.getPath());
+        		try{
+	    			String vcard = FileUtil.readFile(vcfFile);
+	    			textView.setText(vcard);
+	        		askUserForImport(vcard);
+        		} catch (IOException e) {
+        			Log.e(TAG, e.getMessage(), e);
+        		}
         	}else{
         		Toast.makeText(this, "Unexpected intent: " + intent, Toast.LENGTH_LONG).show();
         	}
         }
 	}
+	
+	
 	
 	private void askUserForImport(final String vcard){
 		AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -59,16 +84,6 @@ public class VCardAdder extends Activity{
  		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
  		startActivity(intent);
 	}
-	
-	
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        
-        setContentView(R.layout.adder);
-        textView = ((TextView) findViewById(R.id.TextView01));
-
-    }
     
     private Uri importCard(final Context context, final String vcard) {
     	Contact contact = new Contact(vcard, null, null, null);
