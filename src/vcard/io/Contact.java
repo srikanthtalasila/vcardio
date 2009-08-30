@@ -74,7 +74,9 @@ import com.funambol.util.StringUtil;
 public class Contact {
     static final String NL = "\r\n";
     
-    
+
+	public static final String DEFAULT_CHARSET = "ISO-8859-1";
+	
     // Property name for Instant-message addresses
     static final String IMPROP = "X-IM-NICK";
 
@@ -590,7 +592,7 @@ public class Contact {
     			
     			String propName = ppm.group(1).toUpperCase();
     			Vector<String> propVec = new Vector<String>();
-    			String charSet = "UTF-8";
+    			String charSet = DEFAULT_CHARSET;
     			String encoding = "";
     			while (ppm.find()) {
     				String param = ppm.group(1);
@@ -603,7 +605,7 @@ public class Contact {
     			}
     			if (encoding.equalsIgnoreCase("QUOTED-PRINTABLE")) {
     				try {
-    					val = QuotedPrintable.decode(val.getBytes(charSet), "UTF-8");
+    					val = QuotedPrintable.decode(val.getBytes("ASCII"), charSet);
     				} catch (UnsupportedEncodingException uee) {
     					
     				}

@@ -113,7 +113,7 @@ public class QuotedPrintable {
     /**
      * 
      * @param qp Byte array to decode
-     * @param enc The character encoding of the returned string
+     * @param enc The character encoding of the decoded string
      * @return The decoded string.
      */
     public static String decode(byte[] qp, String enc) {
