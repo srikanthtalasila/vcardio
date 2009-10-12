@@ -18,8 +18,8 @@ import android.util.Log;
 public class SMSReceiver extends BroadcastReceiver {
 	
 	public static final String ACTION_VCARD_SMS = "vcard.io.SMS";
-	public static final String VCARD_EXTRA = "vcard";
-	
+	public static final String EXTRA_VCARD = "vcard";
+		
 	private static final int VCARD_RECEIVED_ID = 1;
 	
 
@@ -29,8 +29,8 @@ public class SMSReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
     	Log.v("test", "receive");
-    	SharedPreferences settings = context.getSharedPreferences(App.PREFS_NAME, 0);
-        boolean monitor = settings.getBoolean(App.MONITOR_SMS_PREF, false);
+    	SharedPreferences settings = context.getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE);
+        boolean monitor = settings.getBoolean(App.PREF_MONITOR_SMS, false);
     	if(monitor){
 	        Bundle bundle = intent.getExtras();
 	        Object messages[] = (Object[]) bundle.get("pdus");
@@ -42,7 +42,7 @@ public class SMSReceiver extends BroadcastReceiver {
 	        String body;
 	        for(SmsMessage message:smsMessage){
 	        	body = message.getMessageBody();
-	        	if(isVCard(body)){        		
+	        	if(isVCard(body)){
 	        		notify(context, message.getOriginatingAddress(), body);
 	        	}
 	        }
@@ -51,7 +51,7 @@ public class SMSReceiver extends BroadcastReceiver {
     
 
     
-    private void notify(final Context context, final String address, final String vcard){
+    private void notify(final Context context, final String address, final String vcard) {
     	String ns = Context.NOTIFICATION_SERVICE;
     	NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(ns);
     	int icon = R.drawable.icon;
@@ -66,7 +66,7 @@ public class SMSReceiver extends BroadcastReceiver {
     	notification.flags |= Notification.FLAG_AUTO_CANCEL;
     	
     	Intent notificationIntent = new Intent(context, VCardAdder.class);
-    	notificationIntent.putExtra("vcard", vcard);
+    	notificationIntent.putExtra(EXTRA_VCARD, vcard);
     	notificationIntent.setAction(ACTION_VCARD_SMS);
     	PendingIntent contentIntent = PendingIntent.getActivity(context, 0, notificationIntent, 0);
 

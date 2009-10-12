@@ -102,6 +102,16 @@ public class Contact {
     
     static final String BIRTHDAY_FIELD = "Birthday:";
     
+    
+    static class SyncDBStatements {
+    	public SQLiteStatement querySyncId;
+    	public SQLiteStatement queryPersonId;
+    	public SQLiteStatement insertSyncId;
+    	public SQLiteStatement updateSyncId;
+    }
+
+    SyncDBStatements mSyncDB;
+    
     /**
      * Contact fields declaration
      */
@@ -447,20 +457,14 @@ public class Contact {
 		 if (ims == null) ims = new ArrayList<RowData>();
 		 else ims.clear();
 	}
-
-	SQLiteStatement querySyncId;
-	SQLiteStatement queryPersonId;
-	SQLiteStatement insertSyncId;
 	
     // Constructors------------------------------------------------
-    public Contact(SQLiteStatement querySyncId, SQLiteStatement queryPersionId, SQLiteStatement insertSyncId) {
-    	this.querySyncId = querySyncId;
-    	this.queryPersonId = queryPersionId;
-    	this.insertSyncId = insertSyncId;
+    public Contact(SyncDBStatements syncDB) {
+    	this.mSyncDB = syncDB;
     }
 
-    public Contact(String vcard, SQLiteStatement querySyncId, SQLiteStatement queryPersionId, SQLiteStatement insertSyncId) {
-    	this(querySyncId, queryPersionId, insertSyncId);
+    public Contact(String vcard, SyncDBStatements syncDB) {
+    	this(syncDB);
     	BufferedReader vcardReader = new BufferedReader(new StringReader(vcard)); 
         try {
 			parseVCard(vcardReader);
@@ -469,14 +473,14 @@ public class Contact {
 		}
     }
 
-    public Contact(BufferedReader vcfReader, SQLiteStatement querySyncId, SQLiteStatement queryPersionId, SQLiteStatement insertSyncId) throws IOException { 
-    	this(querySyncId, queryPersionId, insertSyncId);
+    public Contact(BufferedReader vcfReader, SyncDBStatements syncDB) throws IOException { 
+    	this(syncDB);
     	parseVCard(vcfReader);
     }
     
     public Contact(Cursor peopleCur, ContentResolver cResolver, 
-    		SQLiteStatement querySyncId, SQLiteStatement queryPersionId, SQLiteStatement insertSyncId) {
-    	this(querySyncId, queryPersionId, insertSyncId);
+    		SyncDBStatements syncDB) {
+    	this(syncDB);
         populate(peopleCur, cResolver);
     }
 
@@ -888,19 +892,19 @@ public class Contact {
         setPeopleFields(peopleCur);
         String personID = _id;
         
-        if (querySyncId != null) {
-        	querySyncId.bindString(1, personID);
+        if (mSyncDB != null && mSyncDB.querySyncId != null) {
+        	mSyncDB.querySyncId.bindString(1, personID);
         	try {
-        		syncid = querySyncId.simpleQueryForString();
+        		syncid = mSyncDB.querySyncId.simpleQueryForString();
         	} catch (SQLiteDoneException e) {
-        		if (insertSyncId != null) {
+        		if (mSyncDB.insertSyncId != null) {
 	            	// Create a new syncid 
 	            	syncid = UUID.randomUUID().toString();
 	            	
 	            	// Write the new syncid
-	            	insertSyncId.bindString(1, personID);
-	            	insertSyncId.bindString(2, syncid);
-	            	insertSyncId.executeInsert();
+	            	mSyncDB.insertSyncId.bindString(1, personID);
+	            	mSyncDB.insertSyncId.bindString(2, syncid);
+	            	mSyncDB.insertSyncId.executeInsert();
         		}
         	}
         }
@@ -1273,9 +1277,12 @@ public class Contact {
      * Add a new contact to the Content Resolver
      * 
      * @param key the row number of the existing contact (if known)
+     * @param destGroup the contact group to which a new contact will be added
+     * @param useOnlyGroup don't add the contact to the "All contacts" group as well
+     * @param replace replace existing contacts with the same syncid.
      * @return The row number of the inserted column
      */
-    public long addContact(Context context, long key, boolean replace) {
+    public long addContact(Context context, long key, List<String> destGroups, boolean replace) {
         ContentResolver cResolver = context.getContentResolver();
         ContentValues pCV = getPeopleCV();
         
@@ -1283,9 +1290,9 @@ public class Contact {
         boolean replacing = false;
         
         if (key <= 0 && syncid != null) {
-        	if (queryPersonId != null) try {
-        		queryPersonId.bindString(1, syncid);
-        		setId(queryPersonId.simpleQueryForString());
+        	if ((mSyncDB != null) && (mSyncDB.queryPersonId != null)) try {
+        		mSyncDB.queryPersonId.bindString(1, syncid);
+        		setId(mSyncDB.queryPersonId.simpleQueryForString());
         		key = getId();
         	} catch(SQLiteDoneException e) {
         		// Couldn't locate syncid, we'll add it;
@@ -1316,8 +1323,10 @@ public class Contact {
             setId(newContactUri.getLastPathSegment());
             key = getId();
             
-            // Add the new contact to the myContacts group
-            Contacts.People.addToMyContactsGroup(cResolver, key);
+            // Add the new contact to the destination groups
+            for (String group : destGroups) {
+            	Contacts.People.addToGroup(cResolver, key, group);
+            }
         } else {
         	// update existing Uri
     		if (!replace)
@@ -1332,10 +1341,24 @@ public class Contact {
         // We need to add the syncid to the database so
         // that we'll detect this contact if we try to import
         // it again.
-        if (addSyncId && insertSyncId != null) {
-        	insertSyncId.bindLong(1, key);
-        	insertSyncId.bindString(2, syncid);
-        	insertSyncId.executeInsert();
+        if (addSyncId && mSyncDB != null && mSyncDB.querySyncId != null && mSyncDB.insertSyncId != null) {
+        	mSyncDB.querySyncId.bindLong(1, key);
+        	try {
+        		mSyncDB.querySyncId.simpleQueryForString();
+        		
+        		// The personId is already bound to an old syncid.
+        		// We'll replace it.
+        		if (mSyncDB.updateSyncId != null) {
+        			mSyncDB.updateSyncId.bindString(1, syncid);
+        			mSyncDB.updateSyncId.bindLong(2, key);
+        			mSyncDB.updateSyncId.execute();
+        		}
+        	} catch (SQLiteDoneException e) {
+        		// We can insert a new syncid without violating the uniqueness constraint.
+        		mSyncDB.insertSyncId.bindLong(1, key);
+        		mSyncDB.insertSyncId.bindString(2, syncid);
+        		mSyncDB.insertSyncId.executeInsert();
+        	}
         }
  
         /*

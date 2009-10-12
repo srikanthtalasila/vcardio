@@ -7,6 +7,9 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -18,7 +21,6 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.database.sqlite.SQLiteStatement;
 import android.os.Binder;
 import android.os.IBinder;
 import android.provider.Contacts;
@@ -43,7 +45,7 @@ public class VCardIO extends Service {
     /**
      * This class helps open, create, and upgrade the database file.
      */
-    private static class DatabaseHelper extends SQLiteOpenHelper {
+    static class DatabaseHelper extends SQLiteOpenHelper {
 
         DatabaseHelper(Context context) {
             super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -62,6 +64,15 @@ public class VCardIO extends Service {
 			// No need to do anything --- this is version 1
 			
 		}
+    }
+    
+    static Contact.SyncDBStatements getStatements(SQLiteDatabase db) {
+    	Contact.SyncDBStatements syncDB = new Contact.SyncDBStatements();
+    	syncDB.querySyncId = db.compileStatement("SELECT " + SYNCID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + PERSONID + "=?");
+    	syncDB.queryPersonId = db.compileStatement("SELECT " + PERSONID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + SYNCID + "=?");
+    	syncDB.insertSyncId = db.compileStatement("INSERT INTO  " + SYNCDATA_TABLE_NAME + " (" + PERSONID + "," + SYNCID + ") VALUES (?,?)");
+    	syncDB.updateSyncId = db.compileStatement("UPDATE " + SYNCDATA_TABLE_NAME + " SET " + SYNCID + "=? WHERE " + PERSONID + "=?");
+    	return syncDB;
     }
 
     private DatabaseHelper mOpenHelper;
@@ -161,7 +172,7 @@ public class VCardIO extends Service {
     }
 
     
-    public void doImport(final String fileName, final boolean replace, final App app) {
+    public void doImport(final String fileName, final List<String> destGroups, final boolean replace, final App app) {
    		try {
 
    			File vcfFile = new File(fileName);
@@ -182,16 +193,13 @@ public class VCardIO extends Service {
 
 	            	showNotification();
 	            	SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-	            	SQLiteStatement querySyncId = db.compileStatement("SELECT " + SYNCID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + PERSONID + "=?");
-	            	SQLiteStatement queryPersonId = db.compileStatement("SELECT " + PERSONID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + SYNCID + "=?");
-	            	SQLiteStatement insertSyncId = db.compileStatement("INSERT INTO  " + SYNCDATA_TABLE_NAME + " (" + PERSONID + "," + SYNCID + ") VALUES (?,?)");
-	            	Contact parseContact = new Contact(querySyncId, queryPersonId, insertSyncId);
+	            	Contact parseContact = new Contact(getStatements(db));
 	     			try {
 	     				long ret = 0;
 	     				do  {
 	     					ret = parseContact.parseVCard(vcfBuffer);
 	     					if (ret >= 0) {
-	     						parseContact.addContact(getApplicationContext(), 0, replace);
+	     						parseContact.addContact(getApplicationContext(), 0, destGroups, replace);
 	     						importStatus += parseContact.getParseLen();
 
 		     					// Update the progress bar
@@ -217,7 +225,39 @@ public class VCardIO extends Service {
 		}
     }
     
-    public void doExport(final String fileName, final App app) {
+    private final String GROUP_MEMBER_QUERY = Contacts.GroupMembership.PERSON_ID + "=?";
+    
+    public boolean isInGroup(ContentResolver cResolver, long personId, Set<Long> groupIds) {
+    	Cursor cur = cResolver.query(Contacts.GroupMembership.CONTENT_URI, null, GROUP_MEMBER_QUERY, 
+    							new String[] {String.valueOf(personId)}, null);
+    	boolean retval = false;
+    	if (cur != null) {
+    		int groupCol = cur.getColumnIndex(Contacts.GroupMembership.GROUP_ID);
+    		while (cur.moveToNext()) {
+    			if (groupIds.contains(cur.getLong(groupCol))) {
+    				retval = true;
+    				break;
+    			}
+    		}
+    		cur.close();
+    	}
+    	return retval;
+    }
+    
+    private final String GROUP_NAME_QUERY = Contacts.Groups.NAME + "=?";
+    public long getGroupId(ContentResolver cResolver, String groupName) {
+    	Cursor cur = cResolver.query(Contacts.Groups.CONTENT_URI, null, GROUP_NAME_QUERY, new String[] { groupName }, null);
+    	long groupId = -1;
+		if (cur != null) {
+			if (cur.moveToFirst()) {
+				groupId = cur.getLong(cur.getColumnIndex(Contacts.Groups._ID));
+			}
+			cur.close();
+		}
+		return groupId;
+    }
+    
+    public void doExport(final String fileName, final List<String> srcGroups, final App app) {
    		try {
 			final BufferedWriter vcfBuffer = new BufferedWriter(new FileWriter(fileName));
    			
@@ -231,6 +271,18 @@ public class VCardIO extends Service {
 			
 			
 			final long maxlen = allContacts.getCount();
+			final TreeSet<Long> srcGroupIds;
+			
+			if (srcGroups == null) {
+				srcGroupIds = null;
+			} else {
+				srcGroupIds = new TreeSet<Long>();
+				for (String group : srcGroups) {
+					long groupId = getGroupId(cResolver, group);
+					if (groupId >= 0)
+						srcGroupIds.add(groupId);
+				}
+			}
 
 	        // Start lengthy operation in a background thread
 			new Thread(new Runnable() {
@@ -244,16 +296,17 @@ public class VCardIO extends Service {
 
 	            	showNotification();
 	            	SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-	            	SQLiteStatement querySyncId = db.compileStatement("SELECT " + SYNCID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + PERSONID + "=?");
-	            	SQLiteStatement queryPersonId = db.compileStatement("SELECT " + PERSONID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + SYNCID + "=?");
-	            	SQLiteStatement insertSyncId = db.compileStatement("INSERT INTO  " + SYNCDATA_TABLE_NAME + " (" + PERSONID + "," + SYNCID + ") VALUES (?,?)");
-	            	Contact parseContact = new Contact(querySyncId, queryPersonId, insertSyncId);
+	            	Contact parseContact = new Contact(getStatements(db));
+	            	
+	            	int personIdCol = allContacts.getColumnIndex(Contacts.People._ID); 
 	     			try {
 	     				boolean hasNext = true;
 	     				do  {
-	     					parseContact.populate(allContacts, cResolver);
-	     					parseContact.writeVCard(vcfBuffer);
-	     					
+	     					if (srcGroupIds == null || isInGroup(cResolver, allContacts.getLong(personIdCol), srcGroupIds)) {
+	     						// Either we're looking at all contacts (srcGroupId == null) or this contact is in a src Group
+		     					parseContact.populate(allContacts, cResolver);
+		     					parseContact.writeVCard(vcfBuffer);
+	     					}
 	     					++exportStatus;
 
 	     					// Update the progress bar
