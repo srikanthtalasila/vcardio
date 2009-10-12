@@ -547,7 +547,8 @@ public class Contact {
     	
     	while (line != null && !beginPattern.matcher(line).matches()) {
     		line = vCard.readLine();
-    		parseLen += line.length();
+        	if (line != null)
+        		parseLen += line.length();
     	}
     	
     	if (line == null)
