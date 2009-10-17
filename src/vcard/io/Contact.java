@@ -108,6 +108,7 @@ public class Contact {
     	public SQLiteStatement queryPersonId;
     	public SQLiteStatement insertSyncId;
     	public SQLiteStatement updateSyncId;
+    	public SQLiteStatement deleteSyncId;
     }
 
     SyncDBStatements mSyncDB;
@@ -1289,12 +1290,14 @@ public class Contact {
         
         boolean addSyncId = false;
         boolean replacing = false;
+        boolean foundSyncId = false;
         
         if (key <= 0 && syncid != null) {
         	if ((mSyncDB != null) && (mSyncDB.queryPersonId != null)) try {
         		mSyncDB.queryPersonId.bindString(1, syncid);
         		setId(mSyncDB.queryPersonId.simpleQueryForString());
         		key = getId();
+        		foundSyncId = true;
         	} catch(SQLiteDoneException e) {
         		// Couldn't locate syncid, we'll add it;
         		// need to wait until we know what the key is, though.
@@ -1308,8 +1311,17 @@ public class Contact {
         	newContactUri = ContentUris.withAppendedId(Contacts.People.CONTENT_URI, key);
         	Cursor testit = cResolver.query(newContactUri, null, null, null, null);
         	if (testit == null || testit.getCount() == 0) {
+        		// We couldn't find a person whose id matches key. It may have been deleted. We'll generate
+        		// a new one.
         		newContactUri = null;
-        		pCV.put(Contacts.People._ID, key);
+        		key = -1;
+        		if (foundSyncId) {
+        			// We'll have to delete the old association from the database.
+        			mSyncDB.deleteSyncId.bindString(1, syncid);
+        			mSyncDB.deleteSyncId.execute();
+        			// And re-add the new key.
+        			addSyncId = true;
+        		}
         	}
         	if (testit != null)
         		testit.close();

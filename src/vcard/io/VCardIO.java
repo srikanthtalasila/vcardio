@@ -72,6 +72,7 @@ public class VCardIO extends Service {
     	syncDB.queryPersonId = db.compileStatement("SELECT " + PERSONID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + SYNCID + "=?");
     	syncDB.insertSyncId = db.compileStatement("INSERT INTO  " + SYNCDATA_TABLE_NAME + " (" + PERSONID + "," + SYNCID + ") VALUES (?,?)");
     	syncDB.updateSyncId = db.compileStatement("UPDATE " + SYNCDATA_TABLE_NAME + " SET " + SYNCID + "=? WHERE " + PERSONID + "=?");
+    	syncDB.deleteSyncId = db.compileStatement("DELETE FROM " + SYNCDATA_TABLE_NAME + " WHERE " + SYNCID + "=?");
     	return syncDB;
     }
 
