@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="importfile">File path:</string>
-    <string name="app_name">VCard IO</string>
+    <string name="app_name">vCardIO</string>
 
 <string name="importServiceMsg">Importing VCards</string>
 
 <string name="exportServiceMsg">Exporting VCards</string>
+<string name="app_settings">vCardIO Settings</string>
+<string name="app_contactgroup">Select Contact Groups</string>
 </resources>

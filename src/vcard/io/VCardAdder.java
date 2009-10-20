@@ -16,6 +16,7 @@ import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.provider.Contacts;
 import android.provider.Contacts.People;
 import android.text.TextUtils;
@@ -46,9 +47,10 @@ public class VCardAdder extends Activity {
 		Intent intent = getIntent();
         if(intent != null){
 
-        	SharedPreferences settings = getApplicationContext().getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE);
+        	Context context = getApplicationContext();
+        	SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(context);
 
-            String contactGroupStr = settings.getString(App.PREF_CONTACT_GROUP, Contacts.Groups.GROUP_MY_CONTACTS);
+            String contactGroupStr = settings.getString(context.getResources().getString(R.string.PREF_CONTACT_GROUP), Contacts.Groups.GROUP_MY_CONTACTS);
             String[] importGroupArr = TextUtils.split(contactGroupStr, ",");
             List<String> importGroups = Arrays.asList(importGroupArr);
             

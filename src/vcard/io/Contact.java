@@ -1337,8 +1337,12 @@ public class Contact {
             key = getId();
             
             // Add the new contact to the destination groups
-            for (String group : destGroups) {
-            	Contacts.People.addToGroup(cResolver, key, group);
+            for (String groupId : destGroups) {
+            	try {
+            		Contacts.People.addToGroup(cResolver, key, Long.parseLong(groupId));
+            	} catch (NumberFormatException e) {
+            		// Ignore
+            	}
             }
         } else {
         	// update existing Uri

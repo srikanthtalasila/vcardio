@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.telephony.gsm.SmsMessage;
 import android.util.Log;
 
@@ -21,16 +22,16 @@ public class SMSReceiver extends BroadcastReceiver {
 	public static final String EXTRA_VCARD = "vcard";
 		
 	private static final int VCARD_RECEIVED_ID = 1;
-	
 
     /**
      * @see android.content.BroadcastReceiver#onReceive(android.content.Context, android.content.Intent)
      */
     @Override
     public void onReceive(Context context, Intent intent) {
+    	final String PREF_MONITOR_SMS = context.getResources().getString(R.string.PREF_MONITOR_SMS);
     	Log.v("test", "receive");
-    	SharedPreferences settings = context.getSharedPreferences(App.PREFS_NAME, Context.MODE_PRIVATE);
-        boolean monitor = settings.getBoolean(App.PREF_MONITOR_SMS, false);
+    	SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean monitor = settings.getBoolean(PREF_MONITOR_SMS, false);
     	if(monitor){
 	        Bundle bundle = intent.getExtras();
 	        Object messages[] = (Object[]) bundle.get("pdus");

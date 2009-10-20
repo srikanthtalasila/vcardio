@@ -8,7 +8,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.TreeSet;
 
 import android.app.Notification;
@@ -226,38 +225,6 @@ public class VCardIO extends Service {
 		}
     }
     
-    private final String GROUP_MEMBER_QUERY = Contacts.GroupMembership.PERSON_ID + "=?";
-    
-    public boolean isInGroup(ContentResolver cResolver, long personId, Set<Long> groupIds) {
-    	Cursor cur = cResolver.query(Contacts.GroupMembership.CONTENT_URI, null, GROUP_MEMBER_QUERY, 
-    							new String[] {String.valueOf(personId)}, null);
-    	boolean retval = false;
-    	if (cur != null) {
-    		int groupCol = cur.getColumnIndex(Contacts.GroupMembership.GROUP_ID);
-    		while (cur.moveToNext()) {
-    			if (groupIds.contains(cur.getLong(groupCol))) {
-    				retval = true;
-    				break;
-    			}
-    		}
-    		cur.close();
-    	}
-    	return retval;
-    }
-    
-    private final String GROUP_NAME_QUERY = Contacts.Groups.NAME + "=?";
-    public long getGroupId(ContentResolver cResolver, String groupName) {
-    	Cursor cur = cResolver.query(Contacts.Groups.CONTENT_URI, null, GROUP_NAME_QUERY, new String[] { groupName }, null);
-    	long groupId = -1;
-		if (cur != null) {
-			if (cur.moveToFirst()) {
-				groupId = cur.getLong(cur.getColumnIndex(Contacts.Groups._ID));
-			}
-			cur.close();
-		}
-		return groupId;
-    }
-    
     public void doExport(final String fileName, final List<String> srcGroups, final App app) {
    		try {
 			final BufferedWriter vcfBuffer = new BufferedWriter(new FileWriter(fileName));
@@ -270,19 +237,13 @@ public class VCardIO extends Service {
 				return;
 			}
 			
-			
 			final long maxlen = allContacts.getCount();
-			final TreeSet<Long> srcGroupIds;
+			final TreeSet<String> srcGroupIds;
 			
 			if (srcGroups == null) {
 				srcGroupIds = null;
 			} else {
-				srcGroupIds = new TreeSet<Long>();
-				for (String group : srcGroups) {
-					long groupId = getGroupId(cResolver, group);
-					if (groupId >= 0)
-						srcGroupIds.add(groupId);
-				}
+				srcGroupIds = new TreeSet<String>(srcGroups);
 			}
 
 	        // Start lengthy operation in a background thread
@@ -303,7 +264,7 @@ public class VCardIO extends Service {
 	     			try {
 	     				boolean hasNext = true;
 	     				do  {
-	     					if (srcGroupIds == null || isInGroup(cResolver, allContacts.getLong(personIdCol), srcGroupIds)) {
+	     					if (srcGroupIds == null || srcGroupIds.contains(allContacts.getString(personIdCol))) {
 	     						// Either we're looking at all contacts (srcGroupId == null) or this contact is in a src Group
 		     					parseContact.populate(allContacts, cResolver);
 		     					parseContact.writeVCard(vcfBuffer);

@@ -1,52 +1,59 @@
 package vcard.io;
 
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-import android.app.Activity;
-import android.app.Dialog;
 import android.content.ComponentName;
-import android.content.ContentResolver;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.provider.Contacts;
-import android.text.TextUtils;
-import android.util.SparseBooleanArray;
-import android.view.KeyEvent;
+import android.preference.PreferenceActivity;
+import android.preference.PreferenceManager;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
 import android.view.View.OnClickListener;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.AdapterView.OnItemClickListener;
-import android.widget.TextView.OnEditorActionListener;
 
-public class App extends Activity {
+public class App extends PreferenceActivity {
+ 
+	public String PREF_EXPORT_FILE;
+	public String PREF_IMPORT_FILE;
+	public String DEFAULT_IMPORT_FILE;
+	public String DEFAULT_EXPORT_FILE;
 	
-	public static final String PREFS_NAME = "VCardIOPrefsFile";
-	public static final String PREF_MONITOR_SMS = "monitorsms";
-	public static final String PREF_REPLACE = "replace";
-	public static final String PREF_CONTACT_GROUP = "contactgroup";
-	public static final String PREF_EXPORT_ALLGROUPS = "exportall";
-	public static final String PREF_EXPORT_FILE = "exportfile";
-	public static final String PREF_IMPORT_FILE = "importfile";
-	public static final String DEFAULT_IMPORT_FILE = "/sdcard/contacts.vcf";
-	public static final String DEFAULT_EXPORT_FILE = "/sdcard/backup.vcf";
-	private static final int DIALOG_NEWGROUP = 1; 
+	public String PREF_REPLACE;
+	public String PREF_EXPORT_ALLGROUPS;
+	/*
+	public String PREF_MONITOR_SMS;
 	
+	public String PREF_CONTACT_GROUP;
+	*/
+	private void loadResourceStrings() {
+		PREF_EXPORT_FILE = getResources().getString(R.string.PREF_EXPORT_FILE);
+		PREF_IMPORT_FILE = getResources().getString(R.string.PREF_IMPORT_FILE);
+		DEFAULT_IMPORT_FILE = getResources().getString(R.string.DEFAULT_IMPORT_FILE);
+		DEFAULT_EXPORT_FILE = getResources().getString(R.string.DEFAULT_EXPORT_FILE);
+		
+		PREF_EXPORT_ALLGROUPS = getResources().getString(R.string.PREF_EXPORT_ALLGROUPS);
+		PREF_REPLACE = getResources().getString(R.string.PREF_REPLACE);
+/*
+		PREF_MONITOR_SMS = getResources().getString(R.string.PREF_MONITOR_SMS);
+		
+		PREF_CONTACT_GROUP = getResources().getString(R.string.PREF_CONTACT_GROUP);
+*/
+	}
+
+
     /** Called when the activity is first created. */
 	boolean isActive; 
 	
@@ -56,19 +63,11 @@ public class App extends Activity {
 	int mLastProgress;
 	TextView mStatusText = null;
 	
-	private CheckBox mReplaceOnImport = null;
-	private CheckBox mReceiveSMS;
-	
-	private CheckBox mExportAllGroups;
-	private ListView mGroupChooser;
-	private ArrayAdapter<String> mListAdapter;
-	private ArrayList<String> mContactGroups;
-
 	@Override
 	protected void onPause() {
 		isActive = false; 
 
-		savePrefs();
+		savePrefs(getApplicationContext());
 		super.onPause();
 	}
 
@@ -80,61 +79,53 @@ public class App extends Activity {
 		isActive = true;
 
         // Restore preferences
-        loadPrefs();
+        loadPrefs(getApplicationContext());
         
 		updateProgress(mLastProgress);
 	}	
 	
-	ArrayList<String> getSelectedGroups() {
-		SparseBooleanArray selected = mGroupChooser.getCheckedItemPositions();
-		ArrayList<String> groups = new ArrayList<String>(selected.size());
-		
-		for (int i = 0; i < selected.size(); ++i) {
-			int key = selected.keyAt(i);
-			if (selected.get(key)) {
-				groups.add(mContactGroups.get(key));
-			}
-		}
-		
-		return groups;
-	}
 	
-	protected void savePrefs() {
+	protected void savePrefs(Context context) {
 	    // Save user preferences. We need an Editor object to
 	    // make changes. All objects are from android.context.Context
-	    SharedPreferences settings = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+	    SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(context);
 	    SharedPreferences.Editor editor = settings.edit();
 	    editor.putString(PREF_IMPORT_FILE, ((EditText) findViewById(R.id.ImportFile)).getText().toString());
 	    editor.putString(PREF_EXPORT_FILE, ((EditText) findViewById(R.id.ExportFile)).getText().toString());
-
-	    editor.putBoolean(PREF_MONITOR_SMS, mReceiveSMS.isChecked());
-	    editor.putBoolean(PREF_REPLACE, mReplaceOnImport.isChecked());
-	    editor.putBoolean(PREF_EXPORT_ALLGROUPS, mExportAllGroups.isChecked());
-	    editor.putString(PREF_CONTACT_GROUP, TextUtils.join(",",getSelectedGroups()));
 
 	    // Don't forget to commit your edits!!!
 	    editor.commit();
 	}
 	
-	protected void loadPrefs() {
+	protected void loadPrefs(Context context) {
 	    // Save user preferences. We need an Editor object to
 	    // make changes. All objects are from android.context.Context
-        SharedPreferences settings = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+	    SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(context);
 
         ((EditText) findViewById(R.id.ImportFile)).setText(settings.getString(PREF_IMPORT_FILE, DEFAULT_IMPORT_FILE));
         ((EditText) findViewById(R.id.ExportFile)).setText(settings.getString(PREF_EXPORT_FILE, DEFAULT_EXPORT_FILE));
-        mReceiveSMS.setChecked(settings.getBoolean(PREF_MONITOR_SMS, false));
-        mReplaceOnImport.setChecked(settings.getBoolean(PREF_REPLACE, false));
-        mExportAllGroups.setChecked(settings.getBoolean(PREF_EXPORT_ALLGROUPS, false));
-        
-        String contactGroupStr = settings.getString(PREF_CONTACT_GROUP, Contacts.Groups.GROUP_MY_CONTACTS);
-        String[] contactGroups = TextUtils.split(contactGroupStr, ",");
-        
-        for (String group : contactGroups) {
-	        int groupPos = mContactGroups.indexOf(group); 
-	        if (groupPos >= 0)
-	        	mGroupChooser.setItemChecked(groupPos, true);
-        }
+	}
+	
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+	    MenuInflater inflater = getMenuInflater();
+	    inflater.inflate(R.menu.main_options, menu);
+
+	    return true;
+	}
+
+	/* Handles item selections */
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+	    switch (item.getItemId()) {
+	    case R.id.settings:
+	    	Intent intent = new Intent();
+	    	intent.setClassName(Settings.class.getPackage().getName(), Settings.class.getName());
+	    	startActivity(intent);
+	        return true;
+	    }
+	    return false;
 	}
 	
 	@Override
@@ -168,87 +159,15 @@ public class App extends Activity {
 		});
 	}
 
-	
-	public ArrayList<String> getContactGroups() {
-		ArrayList<String> groups = new ArrayList<String>();
-		
-		ContentResolver cRes = this.getContentResolver();
-		Cursor cur = cRes.query(Contacts.Groups.CONTENT_URI, null, null, null, null);
-		
-		final int groupNameCol = cur.getColumnIndex(Contacts.GroupsColumns.NAME); 
-		
-		if (cur.moveToFirst()) {
-			do {
-				groups.add(cur.getString(groupNameCol));
-			} while (cur.moveToNext());
-		}
-		cur.close();
-		return groups;
-	}
-
-	protected void addContactGroup(String groupName) {
-		ContentResolver cRes = this.getContentResolver();
-		ContentValues cv = new ContentValues();
-		
-		cv.put(Contacts.GroupsColumns.NAME, groupName);
-		
-		Uri newGroup = cRes.insert(Contacts.Groups.CONTENT_URI, cv);
-		if (newGroup != null) {
-			mContactGroups.add(mContactGroups.size() - 1, groupName);
-			mListAdapter.notifyDataSetChanged();
-		}
-	}
-	
-	protected Dialog onCreateDialog(int id) {
-	    final Dialog dialog;
-	    switch(id) {
-	    case DIALOG_NEWGROUP:
-	    	dialog = new Dialog(this);
-
-	    	dialog.setContentView(R.layout.edit_dialog);
-	    	dialog.setTitle("New Group");
-	    	
-	    	final EditText editor = ((EditText) dialog.findViewById(R.id.EditText));
-	    	final Button okButton = ((Button) dialog.findViewById(R.id.DialogOk));
-	    	final Button cancelButton = ((Button) dialog.findViewById(R.id.DialogCancel));
-	    	
-	    	editor.setOnEditorActionListener(new OnEditorActionListener() {
-				@Override
-				public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-					addContactGroup(editor.getText().toString());
-	    			dialog.dismiss();
-					return true;
-				}
-			});
-	    	
-	    	okButton.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					addContactGroup(editor.getText().toString());
-	    			dialog.dismiss();
-				}
-			});
-	    	
-	    	cancelButton.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					dialog.dismiss();
-				}
-			});
-	    	
-	        break;
-	    default:
-	        dialog = null;
-	    }
-	    return dialog;
-	}
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        loadResourceStrings();
 
         // Request the progress bar to be shown in the title
         requestWindowFeature(Window.FEATURE_PROGRESS);
+
+        super.onCreate(savedInstanceState);
+
         setProgress(10000); // Turn it off for now
         
         setContentView(R.layout.main);
@@ -256,32 +175,7 @@ public class App extends Activity {
         Button importButton = (Button) findViewById(R.id.ImportButton);
         Button exportButton = (Button) findViewById(R.id.ExportButton);
 
-        
     	mStatusText = ((TextView) findViewById(R.id.StatusText));
-    	mReplaceOnImport = ((CheckBox) findViewById(R.id.ReplaceOnImport));
-    	mReceiveSMS = ((CheckBox) findViewById(R.id.ReceiveSMS));
-    	mExportAllGroups = ((CheckBox) findViewById(R.id.AllGroups));
-    	mGroupChooser = ((ListView) findViewById(R.id.ChooseGroup));
-    	
-    	// Fill the spinner with the currently existing contact groups
-    	mContactGroups = getContactGroups();
-    	mContactGroups.add("Create New...");
-    	
-    	mListAdapter = new ArrayAdapter<String>(getApplicationContext(), android.R.layout.simple_list_item_multiple_choice, mContactGroups);
-    	mGroupChooser.setAdapter(mListAdapter);
-    	mGroupChooser.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
-    	mGroupChooser.setOnItemClickListener(new OnItemClickListener() {
-			@Override
-			public void onItemClick(AdapterView<?> parent, View view, int position,
-					long id) {
-				if (position == mContactGroups.size() - 1) {
-					// "Create New..." was selected
-					mGroupChooser.setItemChecked(position, false);
-					showDialog(DIALOG_NEWGROUP);
-				}
-			}
-		});
-
     	
     	final Intent app = new Intent(App.this, VCardIO.class);
         OnClickListener listenImport = new OnClickListener() {
@@ -298,8 +192,10 @@ public class App extends Activity {
     				setProgress(0);
     	            mStatusText.setText("Importing Contacts...");
     	            
+    	            boolean replaceOnImport = PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean(PREF_REPLACE, false);
     	            // Start the import
-    	            mBoundService.doImport(fileName, getSelectedGroups(), mReplaceOnImport.isChecked(), App.this);
+    	            mBoundService.doImport(fileName, Arrays.asList(ContactGroupChooser.getSelectedGroupIds(getApplicationContext())), 
+    	            		replaceOnImport, App.this);
     			}
     		}
     	};
@@ -319,11 +215,12 @@ public class App extends Activity {
     	            mStatusText.setText("Exporting Contacts...");
     	            
     	            // Start the export
-    	            ArrayList<String> selectedGroups;
-    	            if (mExportAllGroups.isChecked())
+    	            List<String> selectedGroups;
+    	            boolean exportAllGroups = PreferenceManager.getDefaultSharedPreferences(getApplicationContext()).getBoolean(PREF_EXPORT_ALLGROUPS, false);
+    	            if (exportAllGroups)
     	            	selectedGroups = null;
     	            else
-    	            	selectedGroups = getSelectedGroups();
+    	            	selectedGroups = Arrays.asList(ContactGroupChooser.getSelectedGroupIds(getApplicationContext()));
     	            
     	            mBoundService.doExport(fileName, selectedGroups, App.this);
     			}
@@ -335,6 +232,9 @@ public class App extends Activity {
         bindService(app, mConnection, Context.BIND_AUTO_CREATE);
         importButton.setOnClickListener(listenImport);
         exportButton.setOnClickListener(listenExport);
+        
+        addPreferencesFromResource(R.xml.settings);
+        
     }
     
     private ServiceConnection mConnection = new ServiceConnection() {
