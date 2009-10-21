@@ -4,15 +4,33 @@
     android:layout_height="fill_parent"
     >
 
-<Button android:layout_width="wrap_content" android:layout_height="wrap_content" android:id="@+id/ExportButton" android:layout_alignParentRight="false" android:layout_alignParentLeft="true" android:text="Export to:"></Button>
-<Button android:layout_height="wrap_content" android:id="@+id/ImportButton" android:layout_width="wrap_content" android:layout_below="@+id/ExportButton" android:layout_alignParentLeft="true" android:layout_alignParentRight="false" android:text="Import from:"></Button>
+<Button android:id="@+id/ExportButton" android:layout_width="wrap_content" android:layout_height="wrap_content" 
+	android:layout_alignParentLeft="true" android:text="Export:"></Button>
+<Button android:id="@+id/chooseExportButton" android:layout_width="wrap_content" android:layout_height="wrap_content" 
+	android:layout_alignParentRight="true" android:layout_alignBottom="@id/ExportButton"
+	android:text="..."
+	></Button>
+<EditText android:id="@+id/ExportFile" android:layout_height="wrap_content" android:layout_width="fill_parent"
+	android:layout_toLeftOf="@+id/chooseExportButton" android:layout_toRightOf="@+id/ExportButton"
+	android:text="/sdcard/backup.vcf" android:lines="1" android:ellipsize="start"></EditText>
 
-<EditText android:layout_height="wrap_content" android:id="@+id/ExportFile" android:layout_width="fill_parent" android:text="/sdcard/backup.vcf" android:layout_toRightOf="@+id/ExportButton"></EditText>
-<EditText android:layout_height="wrap_content" android:id="@+id/ImportFile" android:layout_width="fill_parent" android:text="/sdcard/contacts.vcf" android:layout_alignTop="@+id/ImportButton" android:layout_toRightOf="@+id/ImportButton"></EditText>
-<TextView android:id="@+id/StatusText" android:layout_height="wrap_content" android:layout_alignParentBottom="true" android:layout_width="fill_parent"></TextView>
 
-<ListView android:layout_width="fill_parent" android:layout_below="@+id/ImportButton" android:layout_height="fill_parent" 
-android:id="@android:id/list" android:layout_above="@id/StatusText"></ListView>
+<Button android:id="@+id/ImportButton" android:layout_height="wrap_content" android:layout_width="wrap_content" 
+	android:layout_below="@+id/ExportButton" android:layout_alignParentLeft="true" android:text="Import:"></Button>
+<Button android:id="@+id/chooseImportButton" android:layout_width="wrap_content" android:layout_height="wrap_content" 
+	android:layout_alignParentRight="true" android:layout_alignBottom="@id/ImportButton"
+	android:text="..."
+	></Button>
+<EditText android:id="@+id/ImportFile" android:layout_height="wrap_content"  android:layout_width="fill_parent" 
+	android:text="/sdcard/contacts.vcf" android:layout_alignTop="@+id/ImportButton"
+	android:layout_toRightOf="@+id/ImportButton" android:layout_toLeftOf="@+id/chooseImportButton" android:lines="1" android:ellipsize="start"></EditText>
+	
+<TextView android:id="@+id/StatusText" android:layout_height="wrap_content" android:layout_alignParentBottom="true" 
+	android:layout_width="fill_parent"></TextView>
+
+<ListView android:id="@android:id/list" android:layout_width="fill_parent" android:layout_height="fill_parent"
+	android:layout_below="@+id/ImportButton" android:layout_above="@id/StatusText"></ListView>
+
 
 
 </RelativeLayout>

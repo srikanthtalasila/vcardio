@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="filemanager_market_uri">market://search?q=pname:org.openintents.filemanager</string>
+    
     <string name="importfile">File path:</string>
     <string name="app_name">vCardIO</string>
-
-<string name="importServiceMsg">Importing VCards</string>
-
-<string name="exportServiceMsg">Exporting VCards</string>
-<string name="app_settings">vCardIO Settings</string>
-<string name="app_contactgroup">Select Contact Groups</string>
+	<string name="importServiceMsg">Importing VCards</string>
+	<string name="exportServiceMsg">Exporting VCards</string>
+	<string name="app_settings">vCardIO Settings</string>
+	<string name="app_contactgroup">Select Contact Groups</string>
+	<string name="no_file_manager_found">No compatible file manager is installed!</string>
+	<string name="error">Error!</string>
+	<string name="choose_import_file">Select</string>
+	<string name="choose_import_title">Choose vCard file to import</string>
+	<string name="choose_export_file">Select</string>
+	<string name="choose_export_title">Choose filename for export</string>
 </resources>
