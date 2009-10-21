@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="PREF_MONITOR_SMS">monitorsms</string>
+<string name="PREF_REPLACE">replace</string>
+<string name="PREF_CONTACT_GROUP">contactgroup</string>
+<string name="PREF_EXPORT_ALLGROUPS">exportall</string>
+<string name="PREF_EXPORT_FILE">exportfile</string>
+<string name="PREF_IMPORT_FILE">importfile</string>
+<string name="DEFAULT_IMPORT_FILE">/sdcard/contacts.vcf</string>
+<string name="DEFAULT_EXPORT_FILE">/sdcard/backup.vcf</string>
+</resources>

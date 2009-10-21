@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+
+<item android:id="@+id/addgroup" android:titleCondensed="Add Group" android:title="Add New Group"></item>
+
+<item android:id="@+id/delgroup" android:title="Delete Empty Group" android:titleCondensed="Del Group"></item>
+</menu>

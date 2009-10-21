@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+  xmlns:android="http://schemas.android.com/apk/res/android">
+<CheckBoxPreference android:title="Replace existing contacts" android:summary="When disabled existing contacts are skipped" 
+	android:key="@string/PREF_REPLACE"></CheckBoxPreference>
+<CheckBoxPreference android:title="Receive SMS contacts" android:summary="Automatically import vCards from SMS messages" 
+	android:key="@string/PREF_MONITOR_SMS"></CheckBoxPreference>
+<CheckBoxPreference android:key="@string/PREF_EXPORT_ALLGROUPS" android:title="Export all groups" 
+	android:summary="Ignore selected contact groups when exporting"></CheckBoxPreference>
+<vcard.io.SelectedGroupsPreference android:title="Selected Groups"
+	android:key="selectedGroups"></vcard.io.SelectedGroupsPreference>
+</PreferenceScreen>
