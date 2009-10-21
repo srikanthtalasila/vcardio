@@ -107,12 +107,10 @@ public class App extends PreferenceActivity {
 		SharedPreferences settings = PreferenceManager
 				.getDefaultSharedPreferences(context);
 		SharedPreferences.Editor editor = settings.edit();
-		editor
-				.putString(PREF_IMPORT_FILE,
+		editor.putString(PREF_IMPORT_FILE,
 						((EditText) findViewById(R.id.ImportFile)).getText()
 								.toString());
-		editor
-				.putString(PREF_EXPORT_FILE,
+		editor.putString(PREF_EXPORT_FILE,
 						((EditText) findViewById(R.id.ExportFile)).getText()
 								.toString());
 
@@ -184,6 +182,76 @@ public class App extends PreferenceActivity {
 			}
 		});
 	}
+	
+	void startImport() {
+		// Make sure the service is started. It will continue running
+		// until someone calls stopService(). The Intent we use to find
+		// the service explicitly specifies our service component,
+		// because
+		// we want it running in our own process and don't want other
+		// applications to replace it.
+
+		if (mBoundService != null) {
+			String fileName = ((EditText) findViewById(R.id.ImportFile))
+					.getText().toString();
+			// Update the progress bar
+			setProgress(0);
+			mStatusText.setText("Importing Contacts...");
+
+			boolean replaceOnImport = PreferenceManager
+					.getDefaultSharedPreferences(
+							getApplicationContext()).getBoolean(
+							PREF_REPLACE, false);
+			// Start the import
+			mBoundService.doImport(
+							fileName,
+							Arrays
+									.asList(ContactGroupChooser
+											.getSelectedGroupIds(getApplicationContext())),
+							replaceOnImport, this);
+		}
+	}
+	
+	void startExport(boolean forceOverwrite) {
+		// Make sure the service is started. It will continue running
+		// until someone calls stopService(). The Intent we use to find
+		// the service explicitly specifies our service component,
+		// because
+		// we want it running in our own process and don't want other
+		// applications to replace it.
+
+		if (mBoundService != null) {
+			String fileName = ((EditText) findViewById(R.id.ExportFile))
+					.getText().toString();
+			
+			if (!forceOverwrite) {
+				java.io.File exportFile = new java.io.File(fileName);
+				
+				if (exportFile.exists()) {
+					showDialog(DIALOG_CONFIRM_OVERWRITE);
+					return;
+				}
+			}
+			
+			// Update the progress bar
+			setProgress(0);
+			mStatusText.setText("Exporting Contacts...");
+
+			// Start the export
+			List<String> selectedGroups;
+			boolean exportAllGroups = PreferenceManager
+					.getDefaultSharedPreferences(
+							getApplicationContext()).getBoolean(
+							PREF_EXPORT_ALLGROUPS, false);
+			if (exportAllGroups)
+				selectedGroups = null;
+			else
+				selectedGroups = Arrays.asList(ContactGroupChooser
+						.getSelectedGroupIds(getApplicationContext()));
+
+			mBoundService.doExport(fileName, selectedGroups, this);
+		}
+	}
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -204,77 +272,21 @@ public class App extends PreferenceActivity {
 		mStatusText = ((TextView) findViewById(R.id.StatusText));
 
 		final Intent app = new Intent(App.this, VCardIO.class);
-		OnClickListener listenImport = new OnClickListener() {
-			public void onClick(View v) {
-				// Make sure the service is started. It will continue running
-				// until someone calls stopService(). The Intent we use to find
-				// the service explicitly specifies our service component,
-				// because
-				// we want it running in our own process and don't want other
-				// applications to replace it.
-
-				if (mBoundService != null) {
-					String fileName = ((EditText) findViewById(R.id.ImportFile))
-							.getText().toString();
-					// Update the progress bar
-					setProgress(0);
-					mStatusText.setText("Importing Contacts...");
-
-					boolean replaceOnImport = PreferenceManager
-							.getDefaultSharedPreferences(
-									getApplicationContext()).getBoolean(
-									PREF_REPLACE, false);
-					// Start the import
-					mBoundService
-							.doImport(
-									fileName,
-									Arrays
-											.asList(ContactGroupChooser
-													.getSelectedGroupIds(getApplicationContext())),
-									replaceOnImport, App.this);
-				}
-			}
-		};
-
-		OnClickListener listenExport = new OnClickListener() {
-			public void onClick(View v) {
-				// Make sure the service is started. It will continue running
-				// until someone calls stopService(). The Intent we use to find
-				// the service explicitly specifies our service component,
-				// because
-				// we want it running in our own process and don't want other
-				// applications to replace it.
-
-				if (mBoundService != null) {
-					String fileName = ((EditText) findViewById(R.id.ExportFile))
-							.getText().toString();
-					// Update the progress bar
-					setProgress(0);
-					mStatusText.setText("Exporting Contacts...");
-
-					// Start the export
-					List<String> selectedGroups;
-					boolean exportAllGroups = PreferenceManager
-							.getDefaultSharedPreferences(
-									getApplicationContext()).getBoolean(
-									PREF_EXPORT_ALLGROUPS, false);
-					if (exportAllGroups)
-						selectedGroups = null;
-					else
-						selectedGroups = Arrays.asList(ContactGroupChooser
-								.getSelectedGroupIds(getApplicationContext()));
-
-					mBoundService.doExport(fileName, selectedGroups, App.this);
-				}
-			}
-		};
 
 		// Start the service using startService so it won't be stopped when
 		// activity is in background.
 		startService(app);
 		bindService(app, mConnection, Context.BIND_AUTO_CREATE);
-		importButton.setOnClickListener(listenImport);
-		exportButton.setOnClickListener(listenExport);
+		importButton.setOnClickListener(new OnClickListener() {
+			public void onClick(View v) {
+				startImport();
+			}
+		});
+		exportButton.setOnClickListener(new OnClickListener() {
+			public void onClick(View v) {
+				startExport(false);
+			}
+		});
 
 		Button chooseImport = (Button) findViewById(R.id.chooseImportButton);
 
@@ -361,6 +373,21 @@ public class App extends PreferenceActivity {
 	    	dialog = builder.create();
 			break;
 		case DIALOG_CONFIRM_OVERWRITE:
+	    	builder = new AlertDialog.Builder(this);
+	    	builder.setTitle(R.string.confirm_overwrite_title);
+	    	String fileName = ((EditText) findViewById(R.id.ExportFile))
+				.getText().toString();
+	    	builder.setMessage(getString(R.string.confirm_overwrite_message) + " " + fileName);
+	    	builder.setNegativeButton("Cancel", null);
+	    	builder.setPositiveButton("Overwrite", new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+					dialog.dismiss();
+					startExport(true);
+				}
+			});
+	    	dialog = builder.create();
+	    	break;
 		default:
 			dialog = super.onCreateDialog(id);				
 		}

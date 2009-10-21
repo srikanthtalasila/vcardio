@@ -14,4 +14,6 @@
 	<string name="choose_import_title">Choose vCard file to import</string>
 	<string name="choose_export_file">Select</string>
 	<string name="choose_export_title">Choose filename for export</string>
+	<string name="confirm_overwrite_title">Overwrite existing file?</string>
+	<string name="confirm_overwrite_message">Export will overwrite file: </string>
 </resources>
