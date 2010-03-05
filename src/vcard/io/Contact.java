@@ -127,6 +127,12 @@ public class Contact {
     String firstName;
     // Contact last name
     String lastName;
+    // Contact additional names
+    String midNames;
+    // Contact Prefixes
+    String preName;
+    // Contact Suffixes
+    String sufName;
     
     static class RowData {
     	RowData(int type, String data, boolean preferred, String customLabel) {
@@ -211,17 +217,21 @@ public class Contact {
 					 syncid = val;
 				 } else if (propName.equals("N")) {
 					 String[] names = StringUtil.split(val, ";");
-					 // We set only the first given name.
-					 // The others are ignored in input and will not be
-					 // overridden on the server in output.
-					 if (names.length >= 2) {
-						 firstName = names[1];
-						 lastName = names[0];
-					 } else {
-						 String[] names2 = StringUtil.split(names[0], " ");
-						 firstName = names2[0];
-						 if (names2.length > 1)
-							 lastName = names2[1];
+					 switch(names.length) {
+					 	default:
+					 	case 5:
+					 		sufName = names[4]; // suffixes
+					 	case 4:
+					 		preName = names[3]; // prefixes
+					 	case 3:
+					 		midNames = names[2]; // additional names
+					 	case 2:
+					 		firstName = names[1];
+					 		lastName = names[0];
+					 		break;
+					 	case 1:
+					 		parseDisplayName(names[0]);
+					 	case 0:
 					 }
 				 } 
 			 }
@@ -447,6 +457,9 @@ public class Contact {
 		 photo = null;
 		 firstName = null;
 		 lastName = null;
+		 midNames = null;
+		 preName = null;
+		 sufName = null;
 		 if (phones == null) phones = new ArrayList<RowData>();
 		 else phones.clear();
 		 if (emails == null) emails = new ArrayList<RowData>();
@@ -528,11 +541,40 @@ public class Contact {
 	final static Pattern propParamPattern = Pattern.compile("([^;=]+)(=([^;]+))?(;|$)");
 	final static Pattern base64Pattern = Pattern.compile("\\s*([a-zA-Z0-9+/]+={0,2})\\s*$");
 	final static Pattern quotedPrintableSoftbreakPattern = Pattern.compile("(.*)=\\s*$");
-    final static Pattern namePattern = Pattern.compile("(([^,]+),(.*))|((.*?)\\s+(\\S+))");
+    final static Pattern namePattern = Pattern.compile("(([^,]+),(.*))|(\\s*(\\S+)((\\s+(\\S+))*)\\s+(\\S+))");
     
 	// Parse birthday in notes
 	final static Pattern birthdayPattern = Pattern.compile("^" + BIRTHDAY_FIELD + ":\\s*([^;]+)(;\\s*|\\s*$)",Pattern.CASE_INSENSITIVE);
 	   
+	
+	/**
+	 * Parse a display name into first, middle and last names.
+	 * Note: prefixes and suffixes are not recognized.
+	 * @param displayName
+	 */
+	protected void parseDisplayName(String displayName) {
+        if (displayName != null) {
+        	Matcher m = namePattern.matcher(displayName);
+        	if (m.matches()) {
+        		if (m.group(1) != null) {
+        			lastName = m.group(2);
+        			firstName = m.group(3);
+        		} else {
+        			firstName = m.group(5);
+        			lastName = m.group(9);
+        			if (m.group(6) != null) {
+        				midNames = m.group(6).trim();
+        			}
+        		}
+        	} else {
+        		firstName = displayName.trim();
+        		lastName = "";
+        	}
+        } else {
+        	firstName = lastName = "";
+        }		
+	}
+	
     /**
      * Parse the vCard string into the contacts fields
      */
@@ -856,13 +898,15 @@ public class Contact {
         
         vCardBuff.append("N");
 
-    	if (!StringUtil.isASCII(lastName) || !StringUtil.isASCII(firstName))
+    	if (!StringUtil.isASCII(lastName) || !StringUtil.isASCII(firstName) || 
+    			!StringUtil.isASCII(midNames) || !StringUtil.isASCII(preName) || !StringUtil.isASCII(sufName))
     		vCardBuff.append(";CHARSET=UTF-8");
     	
         vCardBuff.append(":").append((lastName != null) ? lastName.trim() : "")
                 .append(";").append((firstName != null) ? firstName.trim() : "")
-                .append(";").append(";").append(";").append(NL);
-
+                .append(";").append((midNames != null) ? midNames.trim() : "")
+                .append(";").append((preName != null) ? preName.trim() : "")
+                .append(";").append((sufName != null) ? sufName.trim() : "").append(NL);
         
         for (RowData email : emails) {
     		formatEmail(vCardBuff, email);
@@ -995,23 +1039,7 @@ public class Contact {
         selectedColumn = cur.getColumnIndex(Contacts.PeopleColumns.NAME);
         displayName = cur.getString(selectedColumn);
 
-        if (displayName != null) {
-        	Matcher m = namePattern.matcher(displayName);
-        	if (m.matches()) {
-        		if (m.group(1) != null) {
-        			lastName = m.group(2);
-        			firstName = m.group(3);
-        		} else {
-        			firstName = m.group(5);
-        			lastName = m.group(6);
-        		}
-        	} else {
-        		firstName = displayName;
-        		lastName = "";
-        	}
-        } else {
-        	firstName = lastName = "";
-        }
+        parseDisplayName(displayName);
         
         selectedColumn = cur.getColumnIndex(Contacts.People.NOTES);
         notes = cur.getString(selectedColumn);
@@ -1168,12 +1196,27 @@ public class Contact {
         if (displayName != null)
         	fullname.append(displayName);
         else {
-        	if (firstName != null)
+        	if (preName != null)
+        		fullname.append(preName);
+        	if (firstName != null) {
+        		if (fullname.length() > 0)
+        			fullname.append(" ");
         		fullname.append(firstName);
+        	}
+        	if (midNames != null) {
+        		if (fullname.length() > 0)
+        			fullname.append(" ");
+        		fullname.append(midNames);
+        	}
         	if (lastName != null) {
-        		if (firstName != null)
+        		if (fullname.length() > 0)
         			fullname.append(" ");
         		fullname.append(lastName);
+        	}
+        	if (sufName != null) {
+        		if (fullname.length() > 0)
+        			fullname.append(" ");
+        		fullname.append(sufName);
         	}
         }
         
