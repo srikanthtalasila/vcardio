@@ -527,6 +527,7 @@ public class Contact {
 	final static Pattern propPattern = Pattern.compile("([^:]+):(.*)");
 	final static Pattern propParamPattern = Pattern.compile("([^;=]+)(=([^;]+))?(;|$)");
 	final static Pattern base64Pattern = Pattern.compile("\\s*([a-zA-Z0-9+/]+={0,2})\\s*$");
+	final static Pattern quotedPrintableSoftbreakPattern = Pattern.compile("(.*)=\\s*$");
     final static Pattern namePattern = Pattern.compile("(([^,]+),(.*))|((.*?)\\s+(\\S+))");
     
 	// Parse birthday in notes
@@ -610,6 +611,29 @@ public class Contact {
     					encoding = paramVal;
     			}
     			if (encoding.equalsIgnoreCase("QUOTED-PRINTABLE")) {
+    				Matcher softBreak = quotedPrintableSoftbreakPattern.matcher(val);
+    				if (softBreak.matches()) {
+    					// Multi-line quoted-printable
+        				StringBuffer tmpVal = new StringBuffer(softBreak.group(1));
+        				do {
+        					line = vCard.readLine();
+         			
+        					if ((line == null) || (line.length() == 0)) {
+        						//skipRead = true;
+        						break;
+        					}
+        					softBreak = quotedPrintableSoftbreakPattern.matcher(line);
+        					if (softBreak.matches()) {
+        						tmpVal.append(softBreak.group(1));
+        					} else {
+        						tmpVal.append(line);
+        						break;
+        					}
+        				} while (true);
+        				
+        				val = tmpVal.toString();
+    				}
+    				
     				try {
     					val = QuotedPrintable.decode(val.getBytes("ASCII"), charSet);
     				} catch (UnsupportedEncodingException uee) {
