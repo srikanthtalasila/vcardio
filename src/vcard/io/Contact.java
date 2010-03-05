@@ -865,7 +865,8 @@ public class Contact {
         
         if (photo != null) {
         	appendField(vCardBuff, "PHOTO;TYPE=JPEG;ENCODING=BASE64", " ");
-        	Base64Coder.mimeEncode(vCardBuff, photo, 76, NL);
+        	vCardBuff.append(" ");
+        	Base64Coder.mimeEncode(vCardBuff, photo, 76, NL + " ");
         	vCardBuff.append(NL);
         	vCardBuff.append(NL);
         }
