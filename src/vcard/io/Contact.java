@@ -1479,7 +1479,7 @@ public class Contact {
         		} while (existingMethods.moveToNext());
         		existingMethods.close();
         		for (Long id : ids) {
-        			Uri method = ContentUris.withAppendedId(Contacts.Phones.CONTENT_URI, id);
+        			Uri method = ContentUris.withAppendedId(Contacts.ContactMethods.CONTENT_URI, id);
         			cResolver.delete(method, null, null);
         		}
         	}
