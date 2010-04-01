@@ -1,13 +1,16 @@
 package vcard.io;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.Arrays;
 import java.util.List;
 
 import vcard.io.VCardIO.DatabaseHelper;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -81,7 +84,7 @@ public class VCardAdder extends Activity {
 		       .setCancelable(false)
 		       .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
 		           public void onClick(DialogInterface dialog, int id) {
-		        	   Uri person = importCard(VCardAdder.this, vcard, contactGroups);
+		        	   Uri person = importCard(VCardAdder.this.getContentResolver(), vcard, contactGroups);
 		        	   Toast.makeText(VCardAdder.this, "Contact added.", Toast.LENGTH_SHORT).show();
 		        	   showContact(person);
 		        	   VCardAdder.this.finish();
@@ -103,10 +106,19 @@ public class VCardAdder extends Activity {
  		startActivity(intent);
 	}
     
-    private Uri importCard(final Context context, final String vcard, final List<String> contactGroups) {
+    private Uri importCard(final ContentResolver cResolver, final String vcard, final List<String> contactGroups) {
     	SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-    	Contact contact = new Contact(vcard, VCardIO.getStatements(db));
-    	long row = contact.addContact(context, 0, contactGroups, false);
+    	AndroidParser aParser = new AndroidParser(VCardIO.getStatements(db));
+    	VCardParser vParser = new VCardParser();
+    	Contact contact = new Contact();
+        BufferedReader vcardReader = new BufferedReader(new StringReader(vcard)); 
+        try {
+             vParser.parseVCard(contact, vcardReader);
+        } catch (IOException e) {
+        	e.printStackTrace();
+        }
+
+    	long row = aParser.addContact(contact, cResolver, 0, contactGroups, false);
     	Uri myPerson = ContentUris.withAppendedId(People.CONTENT_URI, row);
     	return myPerson;
     }    

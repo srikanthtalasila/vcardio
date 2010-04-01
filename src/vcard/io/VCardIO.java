@@ -65,8 +65,8 @@ public class VCardIO extends Service {
 		}
     }
     
-    static Contact.SyncDBStatements getStatements(SQLiteDatabase db) {
-    	Contact.SyncDBStatements syncDB = new Contact.SyncDBStatements();
+    static AndroidParser.SyncDBStatements getStatements(SQLiteDatabase db) {
+    	AndroidParser.SyncDBStatements syncDB = new AndroidParser.SyncDBStatements();
     	syncDB.querySyncId = db.compileStatement("SELECT " + SYNCID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + PERSONID + "=?");
     	syncDB.queryPersonId = db.compileStatement("SELECT " + PERSONID + " FROM " + SYNCDATA_TABLE_NAME + " WHERE " + SYNCID + "=?");
     	syncDB.insertSyncId = db.compileStatement("INSERT INTO  " + SYNCDATA_TABLE_NAME + " (" + PERSONID + "," + SYNCID + ") VALUES (?,?)");
@@ -193,14 +193,18 @@ public class VCardIO extends Service {
 
 	            	showNotification();
 	            	SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-	            	Contact parseContact = new Contact(getStatements(db));
+	            	AndroidParser aParser = new AndroidParser(getStatements(db));
+	            	VCardParser vParser = new VCardParser();
+	            	Contact parseContact = new Contact();
+	            	ContentResolver cResolver = getContentResolver();
+	            	
 	     			try {
 	     				long ret = 0;
 	     				do  {
-	     					ret = parseContact.parseVCard(vcfBuffer);
+	     					ret = vParser.parseVCard(parseContact, vcfBuffer);
 	     					if (ret >= 0) {
-	     						parseContact.addContact(getApplicationContext(), 0, destGroups, replace);
-	     						importStatus += parseContact.getParseLen();
+	     						aParser.addContact(parseContact, cResolver, 0, destGroups, replace);
+	     						importStatus += vParser.getParseLen();
 
 		     					// Update the progress bar
 	                             app.updateProgress((int) (100 * importStatus / maxlen));
@@ -258,7 +262,9 @@ public class VCardIO extends Service {
 
 	            	showNotification();
 	            	SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-	            	Contact parseContact = new Contact(getStatements(db));
+	            	AndroidParser aParser = new AndroidParser(getStatements(db));
+	            	VCardParser vParser = new VCardParser();
+	            	Contact parseContact = new Contact();
 	            	
 	            	int personIdCol = allContacts.getColumnIndex(Contacts.People._ID); 
 	     			try {
@@ -266,8 +272,8 @@ public class VCardIO extends Service {
 	     				do  {
 	     					if (srcGroupIds == null || srcGroupIds.contains(allContacts.getString(personIdCol))) {
 	     						// Either we're looking at all contacts (srcGroupId == null) or this contact is in a src Group
-		     					parseContact.populate(allContacts, cResolver);
-		     					parseContact.writeVCard(vcfBuffer);
+	     						aParser.populate(parseContact, allContacts, cResolver);
+		     					vParser.writeVCard(parseContact, vcfBuffer);
 	     					}
 	     					++exportStatus;
 
