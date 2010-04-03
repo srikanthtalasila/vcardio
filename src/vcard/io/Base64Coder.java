@@ -80,12 +80,15 @@ public static void mimeEncode(Appendable out, byte[] in, int linelength, String 
 	
 	int pad = (3 - (bits / 8)) % 3;
 
-	while (bits > 0) {
-		out.append((char) map1[(val >>> 18) & 0x3f]);
-		val <<= 6; bits -= 6;
-		pos++;
-		if (pos % linelength == 0) {
-			out.append(sep);
+	if (bits > 0) {
+		val <<= 24 - bits;
+		while (bits > 0) {
+			out.append((char) map1[(val >>> 18) & 0x3f]);
+			val <<= 6; bits -= 6;
+			pos++;
+			if (pos % linelength == 0) {
+				out.append(sep);
+			}
 		}
 	}
 	while (pad-- > 0)

@@ -368,14 +368,14 @@ public class VCardParser {
     	// Find Begin.
     	String line = vCard.readLine();
     	if (line != null)
-    		parseLen += line.length();
+    		parseLen += line.length() + 2;
     	else
     		return -1;
     	
     	while (line != null && !beginPattern.matcher(line).matches()) {
     		line = vCard.readLine();
         	if (line != null)
-        		parseLen += line.length();
+        		parseLen += line.length() + 2;
     	}
     	
     	if (line == null)
@@ -393,18 +393,30 @@ public class VCardParser {
     		
     		skipRead = false;
     	
-        	// do multi-line unfolding (cr lf with whitespace immediately following is removed, joining the two lines).  
+        	// do multi-line unfolding (cr lf with whitespace immediately following is removed, joining the two lines).
         	vCard.mark(1);
-        	for (int ch = vCard.read(); ch == (int) ' ' || ch == (int) '\t'; ch = vCard.read()) {
+        	int ch;
+        	for (ch = vCard.read(); ch == (int) ' ' || ch == (int) '\t'; ch = vCard.read()) {
         		vCard.reset();
         		String newLine = vCard.readLine();
-        		if (newLine != null)
-        			line += newLine;
+        		if (newLine != null) {
+            		parseLen += 2; // Assume CR-LF line ending;
+            		int newLen = newLine.length();
+        			int pos = 0;
+        			// Search for first non-whitespace char.
+        			while (pos < newLen && (newLine.charAt(pos) == ' ' || newLine.charAt(pos) == '\t'))
+        				++pos;
+		        	parseLen += pos;		
+        			
+        			line += newLine.substring(pos);
+        		}
         		vCard.mark(1);
         	}
-        	vCard.reset();
+        	if (ch >= 0)
+        		// Reset as long as we didn't reach end of file
+        		vCard.reset();
     		
-    		parseLen += line.length(); // TODO: doesn't include CR LFs
+    		parseLen += line.length() + 2;
     		
     		Matcher pm = propPattern.matcher(line);
     		

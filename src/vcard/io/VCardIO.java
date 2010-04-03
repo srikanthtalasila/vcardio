@@ -219,6 +219,7 @@ public class VCardIO extends Service {
 		            	}
 		            	stopSelf();
 	     			} catch (IOException e) {
+	     				app.updateStatus("IO error: " + e.getMessage());
 	     			}
 	             }
 	         }).start();
